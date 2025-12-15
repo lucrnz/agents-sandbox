@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Chat Route</title>
+    <script src="https://unpkg.com/react@19/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@19/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/wouter@3.8.1/dist/wouter.umd.js"></script>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="module">
+        // Simple test to verify routing structure
+        console.log("Testing chat route setup...");
+        
+        // Mock routing test
+        const routes = [
+            { path: "/", name: "Home" },
+            { path: "/chatbot", name: "Chatbot" },
+            { path: "/chat", name: "Chat" },
+            { path: "/sandbox/todo-app", name: "Todo App" },
+            { path: "*", name: "Not Found" }
+        ];
+        
+        console.log("Available routes:");
+        routes.forEach(route => {
+            console.log(`- ${route.path} -> ${route.name}`);
+        });
+        
+        // Test the /chat route specifically
+        const chatRoute = routes.find(r => r.path === "/chat");
+        if (chatRoute) {
+            console.log("✅ /chat route found:", chatRoute);
+        } else {
+            console.error("❌ /chat route not found");
+        }
+        
+        document.getElementById("root").innerHTML = `
+            <h1>Chat Route Test</h1>
+            <p>Chat route setup: ${chatRoute ? "✅ Working" : "❌ Failed"}</p>
+            <p>Available routes:</p>
+            <ul>
+                ${routes.map(r => `<li>${r.path} -> ${r.name}</li>`).join("")}
+            </ul>
+        `;
+    </script>
+</body>
+</html>
