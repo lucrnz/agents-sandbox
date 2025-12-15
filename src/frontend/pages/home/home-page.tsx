@@ -52,19 +52,6 @@ export default function HomePage() {
             </Link>
           </CardContent>
         </Card>
-
-        <Card className="hover:shadow-md transition-shadow">
-          <CardHeader>
-            <CardTitle>API Tester</CardTitle>
-            <CardDescription>Test AI API endpoints</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-gray-600 mb-4">Direct API interaction</p>
-            <Button className="w-full" disabled>
-              Coming Soon
-            </Button>
-          </CardContent>
-        </Card>
       </main>
 
       <footer className="mt-12 pt-8 border-t border-gray-200">

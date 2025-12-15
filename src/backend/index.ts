@@ -1,9 +1,34 @@
-import { serve } from "bun";
+import { serve, type Server } from "bun";
 import index from "../frontend/index.html";
 
 const server = serve<{ username: string }>({
   routes: {
-    // Serve index.html for all unmatched routes.
+    // WebSocket endpoint - must come before catch-all route
+    "/chat-ws": {
+      GET(req: Request, server: Server<unknown>) {
+        console.log("[BACKEND] WebSocket upgrade request received");
+        console.log("[BACKEND] Request URL:", req.url);
+        console.log(
+          "[BACKEND] Request headers:",
+          Object.fromEntries(req.headers.entries())
+        );
+
+        const upgraded = server.upgrade(req, {
+          data: { username: "anonymous" },
+        });
+
+        console.log("[BACKEND] Upgrade result:", upgraded);
+
+        if (!upgraded) {
+          console.log("[BACKEND] WebSocket upgrade failed");
+          return new Response("WebSocket upgrade failed", { status: 400 });
+        }
+
+        console.log("[BACKEND] WebSocket upgrade successful");
+        return undefined;
+      },
+    },
+    // Serve index.html for all other routes (fullstack bundling)
     "/*": index,
   },
 
@@ -17,9 +42,14 @@ const server = serve<{ username: string }>({
 
   // WebSocket configuration
   websocket: {
+    perMessageDeflate: true,
     // Called when a new WebSocket connection is opened
     open(ws) {
-      console.log(`New WebSocket connection from ${ws.remoteAddress}`);
+      console.log("\n========================================");
+      console.log(`[BACKEND] WebSocket OPEN event triggered`);
+      console.log(`[BACKEND] Remote address: ${ws.remoteAddress}`);
+      console.log("========================================\n");
+
       ws.data.username = "anonymous";
 
       // Send welcome message as JSON
@@ -31,15 +61,47 @@ const server = serve<{ username: string }>({
       );
 
       ws.subscribe("chat");
+
+      // Test ping to verify connection
+      setTimeout(() => {
+        console.log("[BACKEND] Sending test ping");
+        try {
+          ws.send(JSON.stringify({ type: "ping", message: "test" }));
+          console.log("[BACKEND] Ping sent successfully");
+        } catch (error) {
+          console.error("[BACKEND] Error sending ping:", error);
+        }
+      }, 2000);
     },
 
     // Called when a message is received
-    async message(ws: any, message: string) {
-      console.log(`Received WebSocket message: ${message}`);
+    async message(ws: any, message: string | Buffer) {
+      console.log("\n========================================");
+      console.log(`[BACKEND] MESSAGE HANDLER CALLED!`);
+      console.log(`[BACKEND] Raw message type: ${typeof message}`);
+      console.log(`[BACKEND] Raw message:`, message);
+      console.log("========================================\n");
+
+      // Convert message to string if it's not already
+      let messageString: string;
+      if (typeof message === "string") {
+        messageString = message;
+      } else if (message instanceof Buffer) {
+        messageString = message.toString("utf8");
+      } else {
+        messageString = String(message);
+      }
+      console.log("\n========================================");
+      console.log(`[BACKEND] Received WebSocket message`);
+      console.log(`[BACKEND] Message type: ${typeof message}`);
+      console.log(`[BACKEND] Message content:`, messageString);
+      console.log("========================================\n");
 
       try {
         // Try to parse as JSON
-        const data = JSON.parse(message);
+        const data = JSON.parse(messageString);
+
+        console.log("[BACKEND] Parsed data:", data);
 
         if (data.type === "user_message") {
           // Handle AI chatbot message
@@ -58,10 +120,13 @@ const server = serve<{ username: string }>({
             const { xai } = await import("@ai-sdk/xai");
             const { generateText } = await import("ai");
 
+            console.log("Generating AI Response...");
             const result = await generateText({
               model: xai("grok-4-1-fast-non-reasoning"),
               prompt: userMessage,
             });
+
+            console.log("AI Response:", result.text);
 
             // Send AI response
             ws.send(
@@ -97,11 +162,11 @@ const server = serve<{ username: string }>({
         }
       } catch (parseError: unknown) {
         // If not JSON, treat as plain text and echo back
-        console.log("Received non-JSON message:", message);
+        console.log("Received non-JSON message:", messageString);
         ws.send(
           JSON.stringify({
             type: "system",
-            message: `You said: ${message}`,
+            message: `You said: ${messageString}`,
           })
         );
       }
