@@ -21,7 +21,8 @@
     "react": "^19",
     "react-dom": "^19",
     "tailwind-merge": "^3.3.1",
-    "wouter": "^3.8.1"
+    "wouter": "^3.8.1",
+    "zod": "^4.2.0"
   },
   "devDependencies": {
     "@types/bun": "latest",

@@ -3,6 +3,11 @@ import { Button } from "@/frontend/components/ui/button";
 import { Input } from "@/frontend/components/ui/input";
 import { Card } from "@/frontend/components/ui/card";
 import { useWebSocket } from "@/frontend/hooks/useWebSocket";
+import type {
+  AnyMessage,
+  SystemMessage,
+  AIResponse,
+} from "@/shared/websocket-schemas";
 
 export default function ChatPage() {
   const [messages, setMessages] = useState<
@@ -13,83 +18,77 @@ export default function ChatPage() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // WebSocket connection with custom hook
-  const { ws, connectionState, send, reconnect, retryCount, maxRetries } =
-    useWebSocket(
-      `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${
-        window.location.host
-      }/chat-ws`,
-      {
-        onMessage: (event) => {
-          try {
-            const data = JSON.parse(event.data);
-
-            if (data.type === "ai_response") {
-              setMessages((prev) => [
-                ...prev,
-                {
-                  sender: "ai",
-                  text: data.content,
-                  timestamp: new Date().toISOString(),
-                },
-              ]);
-              setIsLoading(false);
-            } else if (data.type === "system") {
-              setMessages((prev) => [
-                ...prev,
-                {
-                  sender: "system",
-                  text: data.message,
-                  timestamp: new Date().toISOString(),
-                },
-              ]);
-            } else {
-              // Handle other message types or raw text
-              setMessages((prev) => [
-                ...prev,
-                {
-                  sender: "system",
-                  text: event.data,
-                  timestamp: new Date().toISOString(),
-                },
-              ]);
-            }
-          } catch (error) {
-            // If not JSON, treat as plain text
+  // WebSocket connection with typed messages only
+  const {
+    ws,
+    connectionState,
+    sendMessage: sendTypedMessage,
+    sendUserMessage,
+    reconnect,
+    retryCount,
+    maxRetries,
+  } = useWebSocket(
+    `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${
+      window.location.host
+    }/chat-ws`,
+    {
+      // Handle all typed messages
+      onMessage: (message: AnyMessage) => {
+        switch (message.type) {
+          case "ai_response": {
+            const aiMessage = message as AIResponse;
             setMessages((prev) => [
               ...prev,
               {
-                sender: "system",
-                text: event.data,
-                timestamp: new Date().toISOString(),
+                sender: "ai",
+                text: aiMessage.content,
+                timestamp: aiMessage.timestamp,
               },
             ]);
+            setIsLoading(false);
+            break;
           }
-        },
-        onConnectionStateChange: (state, prevState) => {
-          // Add system messages for state transitions
-          if (state === "connected" && prevState !== "connected") {
+          case "system": {
+            const systemMessage = message as SystemMessage;
             setMessages((prev) => [
               ...prev,
               {
                 sender: "system",
-                text: "Connected to AI Chatbot",
+                text: systemMessage.message,
                 timestamp: new Date().toISOString(),
               },
             ]);
-          } else if (state === "failed") {
-            setMessages((prev) => [
-              ...prev,
-              {
-                sender: "system",
-                text: `Connection failed after ${maxRetries} attempts. Click retry to reconnect.`,
-                timestamp: new Date().toISOString(),
-              },
-            ]);
+            break;
           }
-        },
-      }
-    );
+          default:
+            console.warn("Received unknown message type:", message);
+            break;
+        }
+      },
+      onConnectionStateChange: (state, prevState) => {
+        // Add system messages for state transitions
+        if (state === "connected" && prevState !== "connected") {
+          setMessages((prev) => [
+            ...prev,
+            {
+              sender: "system",
+              text: "Connected to AI Chatbot",
+              timestamp: new Date().toISOString(),
+            },
+          ]);
+        } else if (state === "failed") {
+          setMessages((prev) => [
+            ...prev,
+            {
+              sender: "system",
+              text: `Connection failed after ${maxRetries} attempts. Click retry to reconnect.`,
+              timestamp: new Date().toISOString(),
+            },
+          ]);
+        }
+      },
+    }
+  );
 
   // Derive connection status
   const isConnected = connectionState === "connected";
@@ -114,12 +113,13 @@ export default function ChatPage() {
     setInputMessage("");
     setIsLoading(true);
 
-    // Send message to WebSocket server
-    send({
-      type: "user_message",
-      content: inputMessage,
-      timestamp: new Date().toISOString(),
-    });
+    // Send message using typed function for type safety
+    const success = sendUserMessage(inputMessage);
+    
+    if (!success) {
+      console.error("Failed to send message");
+      setIsLoading(false);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {

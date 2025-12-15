@@ -1,13 +1,21 @@
 import { serve, type Server } from "bun";
 import index from "../frontend/index.html";
+import { randomUUID } from "node:crypto";
+import {
+  validateIncomingMessage,
+  createSystemMessage,
+  createAIResponse,
+  type IncomingMessage,
+  type UserMessage,
+} from "../shared/websocket-schemas";
 
-const server = serve<{ username: string }>({
+const server = serve<{ userId: string }>({
   routes: {
     // WebSocket endpoint - must come before catch-all route
     "/chat-ws": {
       GET(req: Request, server: Server<unknown>) {
         const upgraded = server.upgrade(req, {
-          data: { username: "anonymous" },
+          data: { userId: randomUUID() },
         });
 
         if (!upgraded) {
@@ -33,35 +41,29 @@ const server = serve<{ username: string }>({
     perMessageDeflate: true,
     // Called when a new WebSocket connection is opened
     open(ws) {
-      ws.send(
-        JSON.stringify({
-          type: "system",
-          message: "Welcome! You are connected to the AI Chatbot server",
-        })
+      const welcomeMessage = createSystemMessage(
+        "Welcome! You are connected to the AI Chatbot server"
       );
+      ws.send(JSON.stringify(welcomeMessage));
 
       ws.subscribe("chat");
     },
 
     // Called when a message is received
-    async message(ws: any, message: string) {
+    async message(ws, message: string) {
       try {
-        // Try to parse as JSON
-        const data = JSON.parse(message);
+        // Parse and validate incoming message with Zod
+        const rawData = JSON.parse(message);
+        const validatedMessage: IncomingMessage = validateIncomingMessage(rawData);
 
-        console.log("[BACKEND] Parsed data:", data);
-
-        if (data.type === "user_message") {
+        if (validatedMessage.type === "user_message") {
           // Handle AI chatbot message
-          const userMessage = data.content;
+          const userMessage: UserMessage = validatedMessage;
+          const userContent = userMessage.content;
 
           // Send typing indicator
-          ws.send(
-            JSON.stringify({
-              type: "system",
-              message: "AI is thinking...",
-            })
-          );
+          const thinkingMessage = createSystemMessage("AI is thinking...");
+          ws.send(JSON.stringify(thinkingMessage));
 
           try {
             // Import dynamically to handle potential API key issues gracefully
@@ -71,53 +73,40 @@ const server = serve<{ username: string }>({
             console.log("Generating AI Response...");
             const result = await generateText({
               model: xai("grok-4-1-fast-non-reasoning"),
-              prompt: userMessage,
+              prompt: userContent,
             });
 
             console.log("AI Response:", result.text);
 
-            // Send AI response
-            ws.send(
-              JSON.stringify({
-                type: "ai_response",
-                content: result.text,
-                timestamp: new Date().toISOString(),
-              })
-            );
+            // Send AI response with type safety
+            const aiResponse = createAIResponse(result.text);
+            ws.send(JSON.stringify(aiResponse));
           } catch (aiError: unknown) {
             console.error("AI Error:", aiError);
-            ws.send(
-              JSON.stringify({
-                type: "system",
-                message:
-                  "Failed to generate AI response: " +
-                  (aiError instanceof Error
-                    ? aiError.message
-                    : "Unknown error"),
-                error: true,
-              })
+            const errorMessage = createSystemMessage(
+              "Failed to generate AI response: " +
+                (aiError instanceof Error
+                  ? aiError.message
+                  : "Unknown error"),
+              true // error flag
             );
+            ws.send(JSON.stringify(errorMessage));
           }
         } else {
-          // Handle other message types
-          console.log("Received non-user_message:", data);
-          ws.send(
-            JSON.stringify({
-              type: "system",
-              message: "Message received but not processed as AI request",
-            })
+          // Handle other message types (future extension)
+          console.log("Received unsupported message type:", validatedMessage.type);
+          const unsupportedMessage = createSystemMessage(
+            "Message received but not processed as AI request"
           );
+          ws.send(JSON.stringify(unsupportedMessage));
         }
       } catch (parseError: unknown) {
-        // If not JSON, treat as plain text and echo back
-        console.error("Received non-JSON message:", { message, parseError });
-        ws.send(
-          JSON.stringify({
-            type: "system",
-            message:
-              "We are sorry, but we are not able to process your message. Please try again later.",
-          })
+        // Handle JSON parse errors and validation errors
+        console.error("Error processing message:", { message, parseError });
+        const errorMessage = createSystemMessage(
+          "We are sorry, but we are not able to process your message. Please try again later."
         );
+        ws.send(JSON.stringify(errorMessage));
       }
     },
 

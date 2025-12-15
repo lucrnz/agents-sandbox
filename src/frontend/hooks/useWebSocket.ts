@@ -1,4 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import {
+  validateAnyMessage,
+  createUserMessage,
+  type AnyMessage,
+  type UserMessage,
+} from "@/shared/websocket-schemas";
 
 // Connection state machine
 export type ConnectionState =
@@ -11,7 +17,7 @@ export type ConnectionState =
 // Hook options interface
 export interface UseWebSocketOptions {
   onOpen?: (event: Event) => void;
-  onMessage?: (event: MessageEvent) => void;
+  onMessage?: (message: AnyMessage) => void; // Only typed messages now
   onClose?: (event: CloseEvent) => void;
   onError?: (event: Event) => void;
   onConnectionStateChange?: (
@@ -26,7 +32,8 @@ export interface UseWebSocketOptions {
 export interface UseWebSocketReturn {
   ws: React.RefObject<WebSocket | null>;
   connectionState: ConnectionState;
-  send: (data: string | object) => boolean;
+  sendMessage: (message: UserMessage) => boolean; // Primary send function
+  sendUserMessage: (content: string) => boolean; // Convenience function
   reconnect: () => void;
   retryCount: number;
   maxRetries: number;
@@ -140,7 +147,16 @@ export function useWebSocket(
 
       socket.onmessage = (event) => {
         if (options.onMessage) {
-          options.onMessage(event);
+          try {
+            const rawData = JSON.parse(event.data);
+            const validatedMessage = validateAnyMessage(rawData);
+            options.onMessage(validatedMessage);
+          } catch (error) {
+            console.error("Failed to validate incoming WebSocket message:", {
+              data: event.data,
+              error,
+            });
+          }
         }
       };
 
@@ -209,20 +225,19 @@ export function useWebSocket(
     clearReconnectTimeout,
   ]);
 
-  // Send message function
-  const send = useCallback((data: string | object): boolean => {
-    console.log("[useWebSocket] send called with:", data);
-    console.log("[useWebSocket] WebSocket state:", ws.current?.readyState);
-
+  // Send typed message function (primary send method)
+  const sendMessage = useCallback((message: UserMessage): boolean => {
+    console.log("[useWebSocket] sendMessage called with:", message);
+    
     if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
       console.warn("Cannot send message: WebSocket is not connected");
       return false;
     }
 
     try {
-      const message = typeof data === "string" ? data : JSON.stringify(data);
-      console.log("[useWebSocket] Sending message:", message);
-      ws.current.send(message);
+      const messageString = JSON.stringify(message);
+      console.log("[useWebSocket] Sending message:", messageString);
+      ws.current.send(messageString);
       console.log("[useWebSocket] Message sent successfully");
       return true;
     } catch (error) {
@@ -230,6 +245,12 @@ export function useWebSocket(
       return false;
     }
   }, []);
+
+  // Convenience function to send user messages
+  const sendUserMessage = useCallback((content: string): boolean => {
+    const userMessage = createUserMessage(content);
+    return sendMessage(userMessage);
+  }, [sendMessage]);
 
   // Manual reconnect function (resets retry count)
   const reconnect = useCallback(() => {
@@ -269,7 +290,8 @@ export function useWebSocket(
   return {
     ws,
     connectionState,
-    send,
+    sendMessage,
+    sendUserMessage,
     reconnect,
     retryCount,
     maxRetries,
