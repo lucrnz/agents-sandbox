@@ -6,25 +6,13 @@ const server = serve<{ username: string }>({
     // WebSocket endpoint - must come before catch-all route
     "/chat-ws": {
       GET(req: Request, server: Server<unknown>) {
-        console.log("[BACKEND] WebSocket upgrade request received");
-        console.log("[BACKEND] Request URL:", req.url);
-        console.log(
-          "[BACKEND] Request headers:",
-          Object.fromEntries(req.headers.entries())
-        );
-
         const upgraded = server.upgrade(req, {
           data: { username: "anonymous" },
         });
 
-        console.log("[BACKEND] Upgrade result:", upgraded);
-
         if (!upgraded) {
-          console.log("[BACKEND] WebSocket upgrade failed");
           return new Response("WebSocket upgrade failed", { status: 400 });
         }
-
-        console.log("[BACKEND] WebSocket upgrade successful");
         return undefined;
       },
     },
@@ -45,14 +33,6 @@ const server = serve<{ username: string }>({
     perMessageDeflate: true,
     // Called when a new WebSocket connection is opened
     open(ws) {
-      console.log("\n========================================");
-      console.log(`[BACKEND] WebSocket OPEN event triggered`);
-      console.log(`[BACKEND] Remote address: ${ws.remoteAddress}`);
-      console.log("========================================\n");
-
-      ws.data.username = "anonymous";
-
-      // Send welcome message as JSON
       ws.send(
         JSON.stringify({
           type: "system",
@@ -61,45 +41,13 @@ const server = serve<{ username: string }>({
       );
 
       ws.subscribe("chat");
-
-      // Test ping to verify connection
-      setTimeout(() => {
-        console.log("[BACKEND] Sending test ping");
-        try {
-          ws.send(JSON.stringify({ type: "ping", message: "test" }));
-          console.log("[BACKEND] Ping sent successfully");
-        } catch (error) {
-          console.error("[BACKEND] Error sending ping:", error);
-        }
-      }, 2000);
     },
 
     // Called when a message is received
-    async message(ws: any, message: string | Buffer) {
-      console.log("\n========================================");
-      console.log(`[BACKEND] MESSAGE HANDLER CALLED!`);
-      console.log(`[BACKEND] Raw message type: ${typeof message}`);
-      console.log(`[BACKEND] Raw message:`, message);
-      console.log("========================================\n");
-
-      // Convert message to string if it's not already
-      let messageString: string;
-      if (typeof message === "string") {
-        messageString = message;
-      } else if (message instanceof Buffer) {
-        messageString = message.toString("utf8");
-      } else {
-        messageString = String(message);
-      }
-      console.log("\n========================================");
-      console.log(`[BACKEND] Received WebSocket message`);
-      console.log(`[BACKEND] Message type: ${typeof message}`);
-      console.log(`[BACKEND] Message content:`, messageString);
-      console.log("========================================\n");
-
+    async message(ws: any, message: string) {
       try {
         // Try to parse as JSON
-        const data = JSON.parse(messageString);
+        const data = JSON.parse(message);
 
         console.log("[BACKEND] Parsed data:", data);
 
@@ -162,11 +110,12 @@ const server = serve<{ username: string }>({
         }
       } catch (parseError: unknown) {
         // If not JSON, treat as plain text and echo back
-        console.log("Received non-JSON message:", messageString);
+        console.error("Received non-JSON message:", { message, parseError });
         ws.send(
           JSON.stringify({
             type: "system",
-            message: `You said: ${messageString}`,
+            message:
+              "We are sorry, but we are not able to process your message. Please try again later.",
           })
         );
       }
