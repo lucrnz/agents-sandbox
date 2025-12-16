@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { Button } from "@/frontend/components/ui/button";
 import { Input } from "@/frontend/components/ui/input";
 import { Card } from "@/frontend/components/ui/card";
+import { ArrowUp } from "lucide-react";
+import { Textarea } from "@/frontend/components/ui/textarea";
 import { useWebSocket } from "@/frontend/hooks/useWebSocket";
 import ConversationSidebar from "@/frontend/components/conversation-sidebar";
 import { MarkdownRenderer } from "@/frontend/components/markdown-renderer";
@@ -40,6 +42,7 @@ export default function ChatPage() {
   const [hasSelectedConversation, setHasSelectedConversation] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const { connectionState, send, on, reconnect } = useWebSocket({
     url: `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${
@@ -66,7 +69,7 @@ export default function ChatPage() {
           },
         ]);
         setIsLoading(false);
-      }
+      },
     );
 
     const unsubConversationUpdated = on<ConversationUpdatedPayload>(
@@ -77,7 +80,7 @@ export default function ChatPage() {
         }
         // Refresh conversations list
         loadConversationsList();
-      }
+      },
     );
 
     const unsubSystemNotification = on<SystemNotificationPayload>(
@@ -91,7 +94,7 @@ export default function ChatPage() {
             timestamp: new Date().toISOString(),
           },
         ]);
-      }
+      },
     );
 
     return () => {
@@ -118,6 +121,27 @@ export default function ChatPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // ============================================================================
+  // Auto-resize textarea
+  // ============================================================================
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInputMessage(e.target.value);
+    
+    // Auto-resize textarea
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
 
   // ============================================================================
   // Actions
@@ -193,7 +217,7 @@ export default function ChatPage() {
           sender: msg.role,
           text: msg.content,
           timestamp: msg.createdAt,
-        }))
+        })),
       );
       setHasSelectedConversation(true);
     } catch (error) {
@@ -244,15 +268,15 @@ export default function ChatPage() {
         />
       )}
 
-      <div className="flex-1 flex flex-col">
-        <header className="bg-card shadow-sm border-b px-4 py-3 flex items-center justify-between">
+      <div className="flex-1 flex flex-col min-h-0">
+        <header className="bg-card shadow-sm border-b px-4 py-5 flex items-center justify-between flex-shrink-0">
           <h1 className="text-xl font-bold text-foreground">
             {currentConversationTitle} - AI Chat
           </h1>
           <div className="flex items-center gap-2">
             <span
               data-status={status.status}
-              className="w-2 h-2 rounded-full 
+              className="w-2 h-2 rounded-full
                 data-[status=connected]:bg-green-500 data-[status=connected]:dark:bg-green-600
                 data-[status=connecting]:bg-yellow-500 data-[status=connecting]:dark:bg-yellow-600
                 data-[status=reconnecting]:bg-orange-500 data-[status=reconnecting]:dark:bg-orange-600
@@ -264,7 +288,7 @@ export default function ChatPage() {
         </header>
 
         {connectionState === "failed" && (
-          <div className="mx-4 mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg flex items-center justify-between">
+          <div className="mx-4 mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg flex items-center justify-between flex-shrink-0">
             <p className="text-destructive">Connection failed</p>
             <Button onClick={reconnect} variant="outline" size="sm">
               Retry Connection
@@ -272,8 +296,8 @@ export default function ChatPage() {
           </div>
         )}
 
-        <div className="flex-1 overflow-hidden p-4">
-          <Card className="h-full flex flex-col">
+        <div className="flex-1 overflow-hidden p-4 min-h-0">
+          <div className="h-full flex flex-col py-2 px-1 shadow-md rounded-xl border border-neutral-600/50 dark:border-neutral-500/50">
             {!hasSelectedConversation ? (
               <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
                 <div className="max-w-4xl mx-auto">
@@ -311,7 +335,7 @@ export default function ChatPage() {
                             </h4>
                             <p className="text-sm text-muted-foreground mt-1">
                               {new Date(
-                                conversation.updatedAt
+                                conversation.updatedAt,
                               ).toLocaleString()}
                             </p>
                           </div>
@@ -344,8 +368,8 @@ export default function ChatPage() {
                           message.sender === "user"
                             ? "flex justify-end"
                             : message.sender === "assistant"
-                            ? "flex justify-center"
-                            : "flex justify-start"
+                              ? "flex justify-center"
+                              : "flex justify-start"
                         }`}
                       >
                         <div
@@ -353,8 +377,8 @@ export default function ChatPage() {
                             message.sender === "user"
                               ? "max-w-xs md:max-w-md lg:max-w-lg xl:max-w-xl rounded-lg p-3 bg-gray-200/60 dark:bg-neutral-700/50 text-foreground"
                               : message.sender === "assistant"
-                              ? "max-w-2xl xl:max-w-3xl p-4 text-foreground"
-                              : "max-w-xs md:max-w-md lg:max-w-lg xl:max-w-xl rounded-lg p-3 bg-muted/70 text-muted-foreground"
+                                ? "max-w-2xl xl:max-w-3xl p-4 text-foreground"
+                                : "max-w-xs md:max-w-md lg:max-w-lg xl:max-w-xl rounded-lg p-3 bg-muted/70 text-muted-foreground"
                           }`}
                         >
                           {message.sender === "assistant" ? (
@@ -387,32 +411,33 @@ export default function ChatPage() {
                   <div ref={messagesEndRef} />
                 </div>
 
-                <div className="border-t p-4 bg-card">
-                  <div className="flex gap-2">
-                    <Input
-                      type="text"
+                <div className="border-t p-3 bg-card">
+                  <div className="flex gap-2 items-end">
+                    <Textarea
+                      ref={textareaRef}
                       value={inputMessage}
-                      onInput={(e) =>
-                        setInputMessage((e.target as HTMLInputElement).value)
-                      }
-                      onKeyUp={handleKeyUp}
+                      onChange={handleInputChange}
+                      onKeyDown={handleKeyDown}
                       placeholder="Type your message..."
                       disabled={!isConnected || isLoading}
-                      className="flex-1"
+                      className="flex-1 resize-none min-h-[40px] max-h-[120px]"
+                      rows={1}
                     />
                     <Button
                       onClick={handleSendMessage}
                       disabled={
                         !isConnected || isLoading || !inputMessage.trim()
                       }
+                      className="rounded-full p-2 h-10 w-10"
+                      aria-label="Send"
                     >
-                      Send
+                      <ArrowUp className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
               </>
             )}
-          </Card>
+          </div>
         </div>
       </div>
     </div>
