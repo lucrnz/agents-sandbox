@@ -7,11 +7,15 @@
   --font-sans-fallback:
     system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
     sans-serif;
+  --font-mono-fallback:
+    'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Source Code Pro', 'Menlo', 'Consolas',
+    monospace;
 }
 
 @theme inline {
   --font-display: "Exo 2", var(--font-sans-fallback);
   --font-body: "Cabin", var(--font-sans-fallback);
+  --font-mono: "IBM Plex Mono", var(--font-mono-fallback);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-sidebar-ring: var(--sidebar-ring);

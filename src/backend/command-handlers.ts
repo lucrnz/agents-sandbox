@@ -187,7 +187,8 @@ commandHandlers.register(LoadConversation, async (payload) => {
       title: conv.title,
       messages: conv.messages.map((m) => ({
         ...m,
-        createdAt: m?.createdAt?.toISOString(),
+        role: m.role as "user" | "assistant",
+        createdAt: m?.createdAt?.toISOString() || new Date().toISOString(),
       })),
     };
   } else {

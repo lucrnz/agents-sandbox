@@ -4,6 +4,7 @@ import { Input } from "@/frontend/components/ui/input";
 import { Card } from "@/frontend/components/ui/card";
 import { useWebSocket } from "@/frontend/hooks/useWebSocket";
 import ConversationSidebar from "@/frontend/components/conversation-sidebar";
+import { MarkdownRenderer } from "@/frontend/components/markdown-renderer";
 import {
   SendMessage,
   LoadConversation,
@@ -182,7 +183,7 @@ export default function ChatPage() {
     }
   };
 
-  const handleLoadConversation = async (conversationId: string) => {
+  const handleLoadConversation = async (conversationId?: string) => {
     try {
       const result = await send(LoadConversation, { conversationId });
       setCurrentConversationId(result.conversationId);
@@ -356,7 +357,13 @@ export default function ChatPage() {
                               : "max-w-xs md:max-w-md lg:max-w-lg xl:max-w-xl rounded-lg p-3 bg-muted/70 text-muted-foreground"
                           }`}
                         >
-                          <p className="whitespace-pre-wrap">{message.text}</p>
+                          {message.sender === "assistant" ? (
+                            <MarkdownRenderer content={message.text} />
+                          ) : (
+                            <p className="whitespace-pre-wrap">
+                              {message.text}
+                            </p>
+                          )}
                           <p
                             className={`text-xs mt-1 ${
                               message.sender === "assistant"

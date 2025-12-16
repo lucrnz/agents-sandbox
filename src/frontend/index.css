@@ -1,4 +1,5 @@
 @import "./globals.css";
+@plugin "@tailwindcss/typography";
 
 @layer base {
   :root {

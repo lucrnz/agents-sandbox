@@ -1,4 +1,4 @@
-import { serve } from "bun";
+import { serve, type Server, type ServerWebSocket } from "bun";
 import index from "../frontend/index.html";
 import {
   WebSocketMessageSchema,
@@ -11,7 +11,7 @@ import { commandHandlers } from "./command-handlers";
 const server = serve<{ conversationId?: string }>({
   routes: {
     "/chat-ws": {
-      GET(req, server) {
+      GET(req: Request, server: Server<{ conversationId?: string }>) {
         const url = new URL(req.url);
         const conversationId = url.searchParams.get("conversationId") || undefined;
 

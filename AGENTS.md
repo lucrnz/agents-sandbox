@@ -37,6 +37,9 @@ test("hello world", () => {
 });
 ```
 
+## Type-Checking
+Run the command `bunx tsc --noEmit` to check for type errors.
+
 ## Frontend
 
 Use HTML imports with `Bun.serve()`. Don't use `vite`. HTML imports fully support React, CSS, Tailwind.
