@@ -10,10 +10,10 @@ import {
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <div className="min-h-screen bg-background p-8">
       <header className="mb-8">
-        <h1 className="text-4xl font-bold text-gray-800">AI Command Center</h1>
-        <p className="text-gray-600 mt-2">
+        <h1 className="text-4xl font-bold text-foreground">AI Command Center</h1>
+        <p className="text-muted-foreground mt-2">
           Welcome to the AI sandbox environment
         </p>
       </header>
@@ -27,7 +27,7 @@ export default function HomePage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-gray-600 mb-4">
+            <p className="text-sm text-muted-foreground mb-4">
               Real-time conversation with Grok
             </p>
             <Link href="/chat">
@@ -42,7 +42,7 @@ export default function HomePage() {
             <CardDescription>Sandbox application</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-gray-600 mb-4">
+            <p className="text-sm text-muted-foreground mb-4">
               Example application for testing
             </p>
             <Link href="/sandbox/todo-app">
@@ -54,8 +54,8 @@ export default function HomePage() {
         </Card>
       </main>
 
-      <footer className="mt-12 pt-8 border-t border-gray-200">
-        <p className="text-sm text-gray-500">
+      <footer className="mt-12 pt-8 border-t border-border">
+        <p className="text-sm text-muted-foreground">
           AI Command Center - WebSocket-based AI Sandbox
         </p>
       </footer>

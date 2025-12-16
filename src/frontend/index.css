@@ -2,7 +2,7 @@
 
 @layer base {
   :root {
-    @apply font-body;
+    @apply font-body tracking-wide leading-6;
   }
 
   body {

@@ -1,109 +1,140 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/frontend/components/ui/button";
 import { Input } from "@/frontend/components/ui/input";
 import { Card } from "@/frontend/components/ui/card";
 import { useWebSocket } from "@/frontend/hooks/useWebSocket";
-import type {
-  AnyMessage,
-  SystemMessage,
-  AIResponse,
-} from "@/shared/websocket-schemas";
+import ConversationSidebar from "@/frontend/components/conversation-sidebar";
+import {
+  SendMessage,
+  LoadConversation,
+  GetConversations,
+  AIResponseEvent,
+  ConversationUpdatedEvent,
+  SystemNotificationEvent,
+  type AIResponsePayload,
+  type ConversationUpdatedPayload,
+  type SystemNotificationPayload,
+} from "@/shared/commands";
+
+interface Message {
+  sender: "user" | "assistant" | "system";
+  text: string;
+  timestamp: string;
+}
+
+interface Conversation {
+  id: string;
+  title: string;
+  updatedAt: string;
+}
 
 export default function ChatPage() {
-  const [messages, setMessages] = useState<
-    { sender: string; text: string; timestamp: string }[]
-  >([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [currentConversationId, setCurrentConversationId] = useState<string>();
+  const [currentConversationTitle, setCurrentConversationTitle] =
+    useState("New Chat");
+  const [hasSelectedConversation, setHasSelectedConversation] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // WebSocket connection with typed messages only
-  const {
-    ws,
-    connectionState,
-    sendMessage: sendTypedMessage,
-    sendUserMessage,
-    reconnect,
-    retryCount,
-    maxRetries,
-  } = useWebSocket(
-    `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${
+  const { connectionState, send, on, reconnect } = useWebSocket({
+    url: `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${
       window.location.host
     }/chat-ws`,
-    {
-      // Handle all typed messages
-      onMessage: (message: AnyMessage) => {
-        switch (message.type) {
-          case "ai_response": {
-            const aiMessage = message as AIResponse;
-            setMessages((prev) => [
-              ...prev,
-              {
-                sender: "ai",
-                text: aiMessage.content,
-                timestamp: aiMessage.timestamp,
-              },
-            ]);
-            setIsLoading(false);
-            break;
-          }
-          case "system": {
-            const systemMessage = message as SystemMessage;
-            setMessages((prev) => [
-              ...prev,
-              {
-                sender: "system",
-                text: systemMessage.message,
-                timestamp: new Date().toISOString(),
-              },
-            ]);
-            break;
-          }
-          default:
-            console.warn("Received unknown message type:", message);
-            break;
-        }
-      },
-      onConnectionStateChange: (state, prevState) => {
-        // Add system messages for state transitions
-        if (state === "connected" && prevState !== "connected") {
-          setMessages((prev) => [
-            ...prev,
-            {
-              sender: "system",
-              text: "Connected to AI Chatbot",
-              timestamp: new Date().toISOString(),
-            },
-          ]);
-        } else if (state === "failed") {
-          setMessages((prev) => [
-            ...prev,
-            {
-              sender: "system",
-              text: `Connection failed after ${maxRetries} attempts. Click retry to reconnect.`,
-              timestamp: new Date().toISOString(),
-            },
-          ]);
-        }
-      },
-    }
-  );
+  });
 
-  // Derive connection status
   const isConnected = connectionState === "connected";
 
+  // ============================================================================
+  // Event Handlers
+  // ============================================================================
+
   useEffect(() => {
-    // Scroll to bottom when messages change
+    const unsubAIResponse = on<AIResponsePayload>(
+      AIResponseEvent,
+      (payload) => {
+        setMessages((prev) => [
+          ...prev,
+          {
+            sender: "assistant",
+            text: payload.content,
+            timestamp: payload.timestamp,
+          },
+        ]);
+        setIsLoading(false);
+      }
+    );
+
+    const unsubConversationUpdated = on<ConversationUpdatedPayload>(
+      ConversationUpdatedEvent,
+      (payload) => {
+        if (payload.conversationId === currentConversationId) {
+          setCurrentConversationTitle(payload.title);
+        }
+        // Refresh conversations list
+        loadConversationsList();
+      }
+    );
+
+    const unsubSystemNotification = on<SystemNotificationPayload>(
+      SystemNotificationEvent,
+      (payload) => {
+        setMessages((prev) => [
+          ...prev,
+          {
+            sender: "system",
+            text: payload.message,
+            timestamp: new Date().toISOString(),
+          },
+        ]);
+      }
+    );
+
+    return () => {
+      unsubAIResponse();
+      unsubConversationUpdated();
+      unsubSystemNotification();
+    };
+  }, [on, currentConversationId]);
+
+  // ============================================================================
+  // Load conversations on connect
+  // ============================================================================
+
+  useEffect(() => {
+    if (isConnected) {
+      loadConversationsList();
+    }
+  }, [isConnected]);
+
+  // ============================================================================
+  // Auto-scroll
+  // ============================================================================
+
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const sendMessage = () => {
-    if (!inputMessage.trim() || connectionState !== "connected") {
-      return;
-    }
+  // ============================================================================
+  // Actions
+  // ============================================================================
 
-    const userMessage = {
+  const loadConversationsList = async () => {
+    try {
+      const result = await send(GetConversations, {});
+      setConversations(result.conversations);
+    } catch (error) {
+      console.error("Failed to load conversations:", error);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!inputMessage.trim() || !isConnected) return;
+
+    const userMessage: Message = {
       sender: "user",
       text: inputMessage,
       timestamp: new Date().toISOString(),
@@ -113,138 +144,269 @@ export default function ChatPage() {
     setInputMessage("");
     setIsLoading(true);
 
-    // Send message using typed function for type safety
-    const success = sendUserMessage(inputMessage);
-    
-    if (!success) {
-      console.error("Failed to send message");
+    try {
+      const result = await send(SendMessage, {
+        content: inputMessage,
+        conversationId: currentConversationId,
+      });
+
+      // Update conversation ID if this was first message
+      if (!currentConversationId) {
+        setCurrentConversationId(result.conversationId);
+      }
+    } catch (error) {
+      console.error("Failed to send message:", error);
       setIsLoading(false);
+      setMessages((prev) => [
+        ...prev,
+        {
+          sender: "system",
+          text: `Error: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`,
+          timestamp: new Date().toISOString(),
+        },
+      ]);
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleNewConversation = async () => {
+    try {
+      const result = await send(LoadConversation, {});
+      setCurrentConversationId(result.conversationId);
+      setCurrentConversationTitle(result.title);
+      setMessages([]);
+      setHasSelectedConversation(true);
+    } catch (error) {
+      console.error("Failed to create conversation:", error);
+    }
+  };
+
+  const handleLoadConversation = async (conversationId: string) => {
+    try {
+      const result = await send(LoadConversation, { conversationId });
+      setCurrentConversationId(result.conversationId);
+      setCurrentConversationTitle(result.title);
+      setMessages(
+        result.messages.map((msg) => ({
+          sender: msg.role,
+          text: msg.content,
+          timestamp: msg.createdAt,
+        }))
+      );
+      setHasSelectedConversation(true);
+    } catch (error) {
+      console.error("Failed to load conversation:", error);
+    }
+  };
+
+  const handleKeyUp = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      sendMessage();
+      handleSendMessage();
     }
   };
 
-  // Get connection status display
+  // ============================================================================
+  // Status Display
+  // ============================================================================
+
   const getStatusDisplay = () => {
     switch (connectionState) {
       case "connected":
-        return { color: "bg-green-500", text: "Connected" };
+        return { status: "connected", text: "Connected" };
       case "connecting":
-        return { color: "bg-yellow-500", text: "Connecting..." };
+        return { status: "connecting", text: "Connecting..." };
       case "reconnecting":
-        return {
-          color: "bg-orange-500",
-          text: `Reconnecting (${retryCount}/${maxRetries})...`,
-        };
+        return { status: "reconnecting", text: "Reconnecting..." };
       case "failed":
-        return { color: "bg-red-500", text: "Connection Failed" };
+        return { status: "failed", text: "Connection Failed" };
       case "disconnected":
-        return { color: "bg-gray-500", text: "Disconnected" };
+        return { status: "disconnected", text: "Disconnected" };
     }
   };
 
   const status = getStatusDisplay();
 
-  return (
-    <div className="flex flex-col h-screen bg-gray-50">
-      <header className="bg-white shadow-sm border-b px-4 py-3 flex items-center justify-between">
-        <h1 className="text-xl font-bold text-gray-800">AI Chat - Grok 4.1</h1>
-        <div className="flex items-center">
-          <span className={`w-2 h-2 rounded-full mr-2 ${status.color}`}></span>
-          <span className="text-sm text-gray-600">{status.text}</span>
-        </div>
-      </header>
+  // ============================================================================
+  // Render
+  // ============================================================================
 
-      {/* Manual reconnect UI when connection fails */}
-      {connectionState === "failed" && (
-        <div className="mx-4 mt-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between">
-          <p className="text-red-800">
-            Connection failed after {maxRetries} attempts
-          </p>
-          <Button onClick={reconnect} variant="outline" size="sm">
-            Retry Connection
-          </Button>
-        </div>
+  return (
+    <div className="flex h-screen bg-background">
+      {hasSelectedConversation && (
+        <ConversationSidebar
+          conversations={conversations}
+          currentConversationId={currentConversationId}
+          onLoadConversation={handleLoadConversation}
+          onNewConversation={handleNewConversation}
+        />
       )}
 
-      <div className="flex-1 overflow-hidden p-4">
-        <Card className="h-full flex flex-col">
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {messages.length === 0 ? (
-              <div className="flex items-center justify-center h-full">
-                <p className="text-gray-500">
-                  Start a conversation with the AI...
-                </p>
+      <div className="flex-1 flex flex-col">
+        <header className="bg-card shadow-sm border-b px-4 py-3 flex items-center justify-between">
+          <h1 className="text-xl font-bold text-foreground">
+            {currentConversationTitle} - AI Chat
+          </h1>
+          <div className="flex items-center gap-2">
+            <span
+              data-status={status.status}
+              className="w-2 h-2 rounded-full 
+                data-[status=connected]:bg-green-500 data-[status=connected]:dark:bg-green-600
+                data-[status=connecting]:bg-yellow-500 data-[status=connecting]:dark:bg-yellow-600
+                data-[status=reconnecting]:bg-orange-500 data-[status=reconnecting]:dark:bg-orange-600
+                data-[status=failed]:bg-red-500 data-[status=failed]:dark:bg-red-600
+                data-[status=disconnected]:bg-gray-500 data-[status=disconnected]:dark:bg-gray-600"
+            ></span>
+            <span className="text-sm text-muted-foreground">{status.text}</span>
+          </div>
+        </header>
+
+        {connectionState === "failed" && (
+          <div className="mx-4 mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg flex items-center justify-between">
+            <p className="text-destructive">Connection failed</p>
+            <Button onClick={reconnect} variant="outline" size="sm">
+              Retry Connection
+            </Button>
+          </div>
+        )}
+
+        <div className="flex-1 overflow-hidden p-4">
+          <Card className="h-full flex flex-col">
+            {!hasSelectedConversation ? (
+              <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+                <div className="max-w-4xl mx-auto">
+                  <h2 className="text-2xl font-bold text-foreground mb-6">
+                    Choose a conversation
+                  </h2>
+
+                  <div className="mb-8">
+                    <Button
+                      onClick={handleNewConversation}
+                      className="w-full sm:w-auto px-6 py-3 text-lg"
+                      size="lg"
+                      disabled={!isConnected}
+                    >
+                      + New Chat
+                    </Button>
+                  </div>
+
+                  {conversations.length > 0 ? (
+                    <div>
+                      <h3 className="text-lg font-semibold text-muted-foreground mb-4">
+                        Recent conversations
+                      </h3>
+                      <div className="space-y-3">
+                        {conversations.map((conversation) => (
+                          <div
+                            key={conversation.id}
+                            onClick={() =>
+                              handleLoadConversation(conversation.id)
+                            }
+                            className="p-4 bg-card border border-border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                          >
+                            <h4 className="font-medium text-foreground truncate">
+                              {conversation.title}
+                            </h4>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {new Date(
+                                conversation.updatedAt
+                              ).toLocaleString()}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <p className="text-muted-foreground">
+                        No previous conversations found.
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
             ) : (
-              messages.map((message, index) => (
-                <div
-                  key={index}
-                  className={`flex ${
-                    message.sender === "user" ? "justify-end" : "justify-start"
-                  }`}
-                >
-                  <div
-                    className={`max-w-xs md:max-w-md lg:max-w-lg xl:max-w-xl rounded-lg p-3 ${
-                      message.sender === "user"
-                        ? "bg-blue-500 text-white"
-                        : message.sender === "ai"
-                        ? "bg-gray-200 text-gray-800"
-                        : "bg-gray-100 text-gray-600"
-                    }`}
-                  >
-                    <p className="whitespace-pre-wrap">{message.text}</p>
-                    <p
-                      className={`text-xs mt-1 ${
-                        message.sender === "user"
-                          ? "text-blue-100"
-                          : "text-gray-500"
-                      }`}
+              <>
+                <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+                  {messages.length === 0 ? (
+                    <div className="flex items-center justify-center h-full">
+                      <p className="text-muted-foreground">
+                        Start a conversation with AI...
+                      </p>
+                    </div>
+                  ) : (
+                    messages.map((message, index) => (
+                      <div
+                        key={index}
+                        className={`${
+                          message.sender === "user"
+                            ? "flex justify-end"
+                            : message.sender === "assistant"
+                            ? "flex justify-center"
+                            : "flex justify-start"
+                        }`}
+                      >
+                        <div
+                          className={`${
+                            message.sender === "user"
+                              ? "max-w-xs md:max-w-md lg:max-w-lg xl:max-w-xl rounded-lg p-3 bg-gray-200/60 dark:bg-neutral-700/50 text-foreground"
+                              : message.sender === "assistant"
+                              ? "max-w-2xl xl:max-w-3xl p-4 text-foreground"
+                              : "max-w-xs md:max-w-md lg:max-w-lg xl:max-w-xl rounded-lg p-3 bg-muted/70 text-muted-foreground"
+                          }`}
+                        >
+                          <p className="whitespace-pre-wrap">{message.text}</p>
+                          <p
+                            className={`text-xs mt-1 ${
+                              message.sender === "assistant"
+                                ? "text-muted-foreground text-center"
+                                : "text-muted-foreground text-right"
+                            }`}
+                          >
+                            {new Date(message.timestamp).toLocaleTimeString()}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                  {isLoading && (
+                    <div className="flex justify-center">
+                      <div className="max-w-2xl xl:max-w-3xl p-4 text-foreground">
+                        <p>Thinking...</p>
+                      </div>
+                    </div>
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
+
+                <div className="border-t p-4 bg-card">
+                  <div className="flex gap-2">
+                    <Input
+                      type="text"
+                      value={inputMessage}
+                      onInput={(e) =>
+                        setInputMessage((e.target as HTMLInputElement).value)
+                      }
+                      onKeyUp={handleKeyUp}
+                      placeholder="Type your message..."
+                      disabled={!isConnected || isLoading}
+                      className="flex-1"
+                    />
+                    <Button
+                      onClick={handleSendMessage}
+                      disabled={
+                        !isConnected || isLoading || !inputMessage.trim()
+                      }
                     >
-                      {new Date(message.timestamp).toLocaleTimeString()}
-                    </p>
+                      Send
+                    </Button>
                   </div>
                 </div>
-              ))
+              </>
             )}
-            {isLoading && (
-              <div className="flex justify-start">
-                <div className="bg-gray-200 text-gray-800 rounded-lg p-3 max-w-xs md:max-w-md">
-                  <p className="whitespace-pre-wrap">Thinking...</p>
-                </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-
-          <div className="border-t p-4 bg-white">
-            <div className="flex gap-2">
-              <Input
-                type="text"
-                value={inputMessage}
-                onInput={(e) =>
-                  setInputMessage((e.target as HTMLInputElement).value)
-                }
-                onKeyPress={handleKeyPress}
-                placeholder="Type your message..."
-                disabled={!isConnected || isLoading}
-                className="flex-1"
-              />
-              <Button
-                onClick={sendMessage}
-                disabled={!isConnected || isLoading || !inputMessage.trim()}
-              >
-                Send
-              </Button>
-            </div>
-            <p className="text-xs text-gray-500 mt-2">AI Generated Response</p>
-          </div>
-        </Card>
+          </Card>
+        </div>
       </div>
     </div>
   );

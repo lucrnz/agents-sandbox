@@ -48,13 +48,13 @@ export function TodoApp() {
           </div>
           <div className="space-y-2">
             {todos.length === 0 ? (
-              <p className="text-gray-500">No todos yet. Add one above!</p>
+              <p className="text-muted-foreground">No todos yet. Add one above!</p>
             ) : (
               <ul className="space-y-2">
                 {todos.map((todo, index) => (
                   <li
                     key={index}
-                    className="flex justify-between items-center p-2 border rounded"
+                    className="flex justify-between items-center p-2 border rounded bg-card"
                   >
                     <span>{todo}</span>
                     <Button
@@ -70,7 +70,7 @@ export function TodoApp() {
             )}
           </div>
           <div className="mt-6">
-            <Link href="/" className="text-blue-500 hover:underline">
+            <Link href="/" className="text-primary hover:underline">
               Back to Home
             </Link>
           </div>

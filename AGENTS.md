@@ -103,7 +103,11 @@ export default function Frontend() {
 root.render(<Frontend />);
 ```
 
-Then, run index.ts
+## Server Operations
+
+IMPORTANT: Do not start the Bun server unless explicitly asked to do so by the user. The server should only be started when specifically requested.
+
+To start the server when asked:
 
 ```sh
 bun --hot ./index.ts
