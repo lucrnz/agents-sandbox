@@ -10,6 +10,7 @@ import {
   deleteConversation,
   addMessage,
   getMessages,
+  updateMessage,
   getConversationWithMessages,
   getOrCreateConversation
 } from './queries';
@@ -27,6 +28,7 @@ export {
   deleteConversation,
   addMessage,
   getMessages,
+  updateMessage,
   getConversationWithMessages,
   getOrCreateConversation
 };

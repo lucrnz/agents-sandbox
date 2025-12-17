@@ -97,6 +97,16 @@ export async function getMessages(conversationId: string) {
     .orderBy(messagesTable.createdAt);
 }
 
+export async function updateMessage(messageId: number, content: string) {
+  const result = await db
+    .update(messagesTable)
+    .set({ content })
+    .where(eq(messagesTable.id, messageId))
+    .returning();
+  
+  return result[0];
+}
+
 export async function getConversationWithMessages(conversationId: string) {
   const conversation = await getConversation(conversationId);
   if (!conversation) return null;

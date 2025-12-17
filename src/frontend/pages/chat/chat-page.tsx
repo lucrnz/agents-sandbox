@@ -14,15 +14,27 @@ import {
   AIResponseEvent,
   ConversationUpdatedEvent,
   SystemNotificationEvent,
+  AgentToolStartEvent,
+  AgentToolCompleteEvent,
+  AgentToolErrorEvent,
   type AIResponsePayload,
   type ConversationUpdatedPayload,
   type SystemNotificationPayload,
+  type AgentToolStartPayload,
+  type AgentToolCompletePayload,
+  type AgentToolErrorPayload,
 } from "@/shared/commands";
 
 interface Message {
   sender: "user" | "assistant" | "system";
   text: string;
   timestamp: string;
+  toolInfo?: {
+    toolName: string;
+    status: "start" | "complete" | "error";
+    description?: string;
+    error?: string;
+  };
 }
 
 interface Conversation {
@@ -97,10 +109,76 @@ export default function ChatPage() {
       },
     );
 
+    // Agent tool event handlers (for future use)
+    const unsubAgentToolStart = on<AgentToolStartPayload>(
+      AgentToolStartEvent,
+      (payload) => {
+        if (payload.conversationId === currentConversationId) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              sender: "system",
+              text: `🔧 Using tool: ${payload.toolName}${payload.description ? ` - ${payload.description}` : ''}`,
+              timestamp: payload.timestamp,
+              toolInfo: {
+                toolName: payload.toolName,
+                status: "start",
+                description: payload.description,
+              },
+            },
+          ]);
+        }
+      },
+    );
+
+    const unsubAgentToolComplete = on<AgentToolCompletePayload>(
+      AgentToolCompleteEvent,
+      (payload) => {
+        if (payload.conversationId === currentConversationId) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              sender: "system",
+              text: `✅ Completed: ${payload.toolName}`,
+              timestamp: payload.timestamp,
+              toolInfo: {
+                toolName: payload.toolName,
+                status: "complete",
+              },
+            },
+          ]);
+        }
+      },
+    );
+
+    const unsubAgentToolError = on<AgentToolErrorPayload>(
+      AgentToolErrorEvent,
+      (payload) => {
+        if (payload.conversationId === currentConversationId) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              sender: "system",
+              text: `❌ Error in ${payload.toolName}: ${payload.error}`,
+              timestamp: payload.timestamp,
+              toolInfo: {
+                toolName: payload.toolName,
+                status: "error",
+                error: payload.error,
+              },
+            },
+          ]);
+        }
+      },
+    );
+
     return () => {
       unsubAIResponse();
       unsubConversationUpdated();
       unsubSystemNotification();
+      unsubAgentToolStart();
+      unsubAgentToolComplete();
+      unsubAgentToolError();
     };
   }, [on, currentConversationId]);
 
@@ -378,7 +456,15 @@ export default function ChatPage() {
                               ? "max-w-xs md:max-w-md lg:max-w-lg xl:max-w-xl rounded-lg p-3 bg-gray-200/60 dark:bg-neutral-700/50 text-foreground"
                               : message.sender === "assistant"
                                 ? "max-w-2xl xl:max-w-3xl p-4 text-foreground"
-                                : "max-w-xs md:max-w-md lg:max-w-lg xl:max-w-xl rounded-lg p-3 bg-muted/70 text-muted-foreground"
+                                : message.toolInfo 
+                                  ? `max-w-xs md:max-w-md lg:max-w-lg xl:max-w-xl rounded-lg p-3 ${
+                                      message.toolInfo.status === "error" 
+                                        ? "bg-red-100 dark:bg-red-900/30 border-l-4 border-red-500 text-red-900 dark:text-red-100"
+                                        : message.toolInfo.status === "complete"
+                                          ? "bg-green-100 dark:bg-green-900/30 border-l-4 border-green-500 text-green-900 dark:text-green-100"
+                                          : "bg-blue-100 dark:bg-blue-900/30 border-l-4 border-blue-500 text-blue-900 dark:text-blue-100"
+                                    }`
+                                  : "max-w-xs md:max-w-md lg:max-w-lg xl:max-w-xl rounded-lg p-3 bg-muted/70 text-muted-foreground"
                           }`}
                         >
                           {message.sender === "assistant" ? (

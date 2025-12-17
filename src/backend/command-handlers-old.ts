@@ -22,7 +22,6 @@ import {
   updateConversation,
 } from "./db";
 import { chatAgent, generateConversationTitle } from "./agent/chat-agent";
-import { generateStatusMessage } from "./agent/agentic-fetch.js";
 
 // ============================================================================
 // Command Handler Type
@@ -131,114 +130,61 @@ commandHandlers.register(SendMessage, async (payload, context) => {
   // Generate AI response in background using ChatAgent
   (async () => {
     try {
-      console.log('[COMMAND_HANDLER] *** SEND MESSAGE COMMAND START ***');
-      console.log('[COMMAND_HANDLER] User content:', content.substring(0, 100) + '...');
-      
       // Use streaming for real-time feel
       let fullResponse = '';
       let isUsingAgenticFetch = false;
       let currentStatus = '';
-      let statusUpdateCount = 0;
       
-      // Create initial message with thinking status
+      const responseStream = chatAgent.generateResponse(content);
+      
+      // Create initial message
       const aiMessage = await addMessage(
         conversation.id,
         "assistant",
-        "🤔 Thinking..."
+        isUsingAgenticFetch ? "🔍 Searching the web..." : "..."
       );
-
-      console.log('[COMMAND_HANDLER] Created initial message:', aiMessage?.id);
 
       // Check if the message was created successfully
       if (!aiMessage || !aiMessage.id) {
         throw new Error("Failed to create assistant message");
       }
 
-      console.log('[COMMAND_HANDLER] Starting AI response stream...');
-      
-      // Create a separate stream for tool status updates
-      const statusStream = chatAgent.generateResponse(content);
-      
       // Stream response with status updates
-      console.log('[COMMAND_HANDLER] Starting to process response stream...');
-      for await (const chunk of statusStream) {
+      for await (const chunk of responseStream) {
         fullResponse += chunk;
-        
-        console.log(`[COMMAND_HANDLER] Received chunk (length: ${chunk.length}):`, chunk.substring(0, 50) + '...');
         
         // Detect if this chunk contains tool-related content
         const chunkLower = chunk.toLowerCase();
         const wasUsingTool = isUsingAgenticFetch;
+        isUsingAgenticFetch = chunkLower.includes('searching for') || 
+                           chunkLower.includes('fetched content from') ||
+                           chunkLower.includes('found') && chunkLower.includes('search results');
         
-        // Enhanced detection for any agentic fetch activity
-        isUsingAgenticFetch = chunkLower.includes('successfully analyzed') ||
-                           chunkLower.includes('found') && chunkLower.includes('search results') ||
-                           chunkLower.includes('no results found') ||
-                           chunkLower.includes('search failed') ||
-                           chunkLower.includes('browsing') ||
-                           chunkLower.includes('📄') ||
-                           chunkLower.includes('🔍') ||
-                           chunkLower.includes('✅') ||
-                           chunkLower.includes('❌');
-        
-        // Update status based on tool usage
+        // Update status if agentic fetch usage changes
         if (!wasUsingTool && isUsingAgenticFetch) {
-          // Extract tool input to generate specific status
-          const toolInputMatch = chunk.match(/for "(.+)"\./);
-          const urlMatch = chunk.match(/analyzed (.+) \(source:/i);
-          
-          if (urlMatch) {
-            currentStatus = "Browsing webpage...";
-            console.log('[COMMAND_HANDLER] *** DETECTED URL ANALYSIS - UPDATING STATUS ***');
-          } else if (toolInputMatch) {
-            currentStatus = `Searching for ${toolInputMatch[1]}`;
-            console.log('[COMMAND_HANDLER] *** DETECTED WEB SEARCH - UPDATING STATUS ***');
-          } else {
-            currentStatus = "Searching for web...";
-            console.log('[COMMAND_HANDLER] *** DETECTED SEARCH - UPDATING STATUS ***');
-          }
-        } else if (wasUsingTool && !isUsingAgenticFetch && fullResponse.length > 100) {
+          currentStatus = "🔍 Searching the web...";
+          console.log('[COMMAND_HANDLER] Detected agentic fetch usage - updating status');
+        } else if (wasUsingTool && !isUsingAgenticFetch) {
+          currentStatus = "📄 Analyzing web content...";
+          console.log('[COMMAND_HANDLER] Agentic fetch completed - updating status');
+        } else if (currentStatus && !isUsingAgenticFetch && fullResponse.length > 50) {
           currentStatus = '';
-          console.log('[COMMAND_HANDLER] *** CLEARING STATUS AFTER TOOL COMPLETION ***');
+          console.log('[COMMAND_HANDLER] Clearing status after sufficient content');
         }
         
-        // Update message more frequently during tool usage
-        statusUpdateCount++;
-        const shouldUpdate = aiMessage.id && (
-          (isUsingAgenticFetch && statusUpdateCount % 3 === 0) || // Every 3rd chunk during tool use
-          (!isUsingAgenticFetch && statusUpdateCount % 20 === 0) || // Every 20th chunk normally
-          statusUpdateCount === 1 || // Always first update
-          currentStatus !== '' // When we have status to clear
-        );
-        
-        if (shouldUpdate) {
-          console.log(`[COMMAND_HANDLER] Updating message (update #${statusUpdateCount}):`, currentStatus || 'Adding chunk');
-          
-          try {
-            if (aiMessage.id) {
-              if (currentStatus) {
-                await updateMessage(aiMessage.id, currentStatus + '\n\n' + fullResponse);
-              } else {
-                await updateMessage(aiMessage.id, fullResponse);
-              }
-            }
-          } catch (error) {
-            console.error('[COMMAND_HANDLER] Error updating message:', error);
+        // Send real-time message updates
+        if (aiMessage.id) {
+          if (currentStatus) {
+            await updateMessage(aiMessage.id, currentStatus + '\n\n' + fullResponse);
+          } else {
+            await updateMessage(aiMessage.id, fullResponse);
           }
         }
       }
 
-      console.log('[COMMAND_HANDLER] *** RESPONSE STREAM COMPLETE ***');
-      console.log('[COMMAND_HANDLER] Final response length:', fullResponse.length);
-      
-      // Final cleanup - ensure we have proper final message
-      if ((currentStatus || fullResponse.length > 0) && aiMessage.id) {
-        console.log('[COMMAND_HANDLER] *** FINAL CLEANUP - UPDATING MESSAGE ***');
-        try {
-          await updateMessage(aiMessage.id, fullResponse);
-        } catch (error) {
-          console.error('[COMMAND_HANDLER] Error in final message update:', error);
-        }
+      // Final cleanup - ensure we have proper status
+      if (currentStatus && aiMessage.id) {
+        await updateMessage(aiMessage.id, fullResponse);
       }
 
       // Emit AI response event
@@ -248,33 +194,26 @@ commandHandlers.register(SendMessage, async (payload, context) => {
         content: fullResponse,
         timestamp: new Date().toISOString(),
       });
-      
-      console.log('[COMMAND_HANDLER] *** SENDING AI RESPONSE EVENT ***');
       ws.send(JSON.stringify(event));
-      
     } catch (error) {
-      console.error('[COMMAND_HANDLER] *** AI GENERATION FAILED ***');
-      console.error('[COMMAND_HANDLER] Error:', error);
-      
+      console.error("AI generation failed:", error);
       // Could emit an error event here
-      try {
-        const errorMessage = await addMessage(
-          conversation.id,
-          "assistant",
-          "❌ Sorry, I encountered an error while processing your request. Please try again."
-        );
+      
+      // Add error message to conversation
+      const errorMessage = await addMessage(
+        conversation.id,
+        "assistant",
+        "Sorry, I encountered an error while generating a response. Please try again."
+      );
 
-        if (errorMessage && errorMessage.id) {
-          const errorEvent = createEventMessage(AIResponseEvent.name, {
-            messageId: errorMessage.id,
-            conversationId: conversation.id,
-            content: "❌ Sorry, I encountered an error while processing your request. Please try again.",
-            timestamp: new Date().toISOString(),
-          });
-          ws.send(JSON.stringify(errorEvent));
-        }
-      } catch (dbError) {
-        console.error('[COMMAND_HANDLER] Database error during error handling:', dbError);
+      if (errorMessage && errorMessage.id) {
+        const errorEvent = createEventMessage(AIResponseEvent.name, {
+          messageId: errorMessage.id,
+          conversationId: conversation.id,
+          content: "Sorry, I encountered an error while generating a response. Please try again.",
+          timestamp: new Date().toISOString(),
+        });
+        ws.send(JSON.stringify(errorEvent));
       }
     }
   })();

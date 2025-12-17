@@ -1,0 +1,218 @@
+import TurndownService from 'turndown';
+import { Window } from 'happy-dom';
+
+const BROWSER_USER_AGENT = 
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+export async function fetchUrlAndConvert(url: string): Promise<string> {
+  console.log('[WEB_TOOLS] Fetching URL:', url);
+  const response = await fetch(url, {
+    headers: {
+      'User-Agent': BROWSER_USER_AGENT,
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.5',
+    },
+  });
+
+  console.log('[WEB_TOOLS] Response status:', response.status, response.statusText);
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch URL: ${response.status} ${response.statusText}`);
+  }
+
+  const contentType = response.headers.get('content-type') || '';
+  console.log('[WEB_TOOLS] Content type:', contentType);
+  let content = await response.text();
+
+  console.log('[WEB_TOOLS] Raw content length:', content.length);
+
+  // Convert HTML to Markdown
+  if (contentType.includes('text/html')) {
+    console.log('[WEB_TOOLS] Processing HTML content');
+    const cleanedHtml = removeNoisyElements(content);
+    content = convertHtmlToMarkdown(cleanedHtml);
+    content = cleanupMarkdown(content);
+    console.log('[WEB_TOOLS] Processed markdown length:', content.length);
+  } 
+  // Format JSON
+  else if (contentType.includes('application/json') || contentType.includes('text/json')) {
+    console.log('[WEB_TOOLS] Processing JSON content');
+    try {
+      const parsed = JSON.parse(content);
+      content = JSON.stringify(parsed, null, 2);
+      console.log('[WEB_TOOLS] Formatted JSON length:', content.length);
+    } catch {
+      console.log('[WEB_TOOLS] JSON parsing failed, keeping original');
+      // Keep original if parsing fails
+    }
+  }
+
+  return content;
+}
+
+function removeNoisyElements(html: string): string {
+  const window = new Window();
+  const document = window.document;
+  document.body.innerHTML = html;
+
+  const noisySelectors = [
+    'script',
+    'style',
+    'nav',
+    'header',
+    'footer',
+    'aside',
+    'noscript',
+    'iframe',
+    'svg',
+  ];
+
+  noisySelectors.forEach(selector => {
+    document.querySelectorAll(selector).forEach(el => el.remove());
+  });
+
+  return document.body.innerHTML;
+}
+
+function convertHtmlToMarkdown(html: string): string {
+  const turndownService = new TurndownService({
+    headingStyle: 'atx',
+    codeBlockStyle: 'fenced',
+  });
+
+  return turndownService.turndown(html);
+}
+
+function cleanupMarkdown(content: string): string {
+  // Collapse multiple blank lines
+  content = content.replace(/\n{3,}/g, '\n\n');
+  
+  // Remove trailing whitespace from each line
+  content = content
+    .split('\n')
+    .map(line => line.trimEnd())
+    .join('\n');
+  
+  // Trim leading/trailing whitespace
+  return content.trim();
+}
+
+// DuckDuckGo search functionality
+export async function searchDuckDuckGo(query: string, maxResults: number = 10): Promise<SearchResult[]> {
+  console.log('[WEB_TOOLS] Searching DuckDuckGo for:', query, 'max results:', maxResults);
+  const formData = new URLSearchParams({
+    q: query,
+    b: '',
+    kl: '',
+  });
+
+  const response = await fetch('https://html.duckduckgo.com/html', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'User-Agent': BROWSER_USER_AGENT,
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.5',
+      'Accept-Encoding': 'gzip, deflate',
+      'Referer': 'https://duckduckgo.com/',
+    },
+    body: formData.toString(),
+  });
+
+  console.log('[WEB_TOOLS] Search response status:', response.status);
+
+  if (!response.ok && response.status !== 202) {
+    throw new Error(`Search failed with status: ${response.status} (DuckDuckGo may be rate limiting)`);
+  }
+
+  const html = await response.text();
+  console.log('[WEB_TOOLS] Raw search HTML length:', html.length);
+  const results = parseSearchResults(html, maxResults);
+  console.log('[WEB_TOOLS] Parsed', results.length, 'search results');
+  return results;
+}
+
+function parseSearchResults(html: string, maxResults: number): SearchResult[] {
+  console.log('[WEB_TOOLS] Parsing search results, max:', maxResults);
+  const window = new Window();
+  const document = window.document;
+  document.body.innerHTML = html;
+
+  const results: SearchResult[] = [];
+  const resultDivs = document.querySelectorAll('.result');
+  console.log('[WEB_TOOLS] Found', resultDivs.length, 'result elements');
+
+  for (let i = 0; i < Math.min(resultDivs.length, maxResults); i++) {
+    const div = resultDivs[i];
+    if (!div) continue;
+    
+    const titleLink = div.querySelector('a.result__a');
+    const snippetLink = div.querySelector('a.result__snippet');
+    
+    if (!titleLink) {
+      console.log('[WEB_TOOLS] No title link found in result', i);
+      continue;
+    }
+
+    const title = titleLink.textContent?.trim() || '';
+    const rawUrl = titleLink.getAttribute('href') || '';
+    const link = cleanDuckDuckGoUrl(rawUrl);
+    const snippet = snippetLink?.textContent?.trim() || '';
+
+    console.log('[WEB_TOOLS] Result', i, '- title:', title.substring(0, 50) + '...', 'link:', link ? 'found' : 'missing');
+
+    if (link && !link.includes('y.js')) {
+      results.push({
+        title,
+        link,
+        snippet,
+        position: results.length + 1,
+      });
+    }
+  }
+
+  console.log('[WEB_TOOLS] Final parsed results:', results.length);
+  return results;
+}
+
+function cleanDuckDuckGoUrl(rawUrl: string): string {
+  console.log('[WEB_TOOLS] Cleaning DuckDuckGo URL:', rawUrl);
+  if (rawUrl && rawUrl.startsWith('//duckduckgo.com/l/?uddg=')) {
+    const match = rawUrl.match(/uddg=([^&]+)/);
+    if (match) {
+      try {
+        const cleaned = decodeURIComponent(match[1] || '');
+        console.log('[WEB_TOOLS] Cleaned URL:', cleaned);
+        return cleaned;
+      } catch {
+        console.log('[WEB_TOOLS] URL decode failed, returning original');
+        return rawUrl;
+      }
+    }
+  }
+  console.log('[WEB_TOOLS] URL is not a DuckDuckGo redirect, returning as-is');
+  return rawUrl;
+}
+
+export function formatSearchResults(results: SearchResult[]): string {
+  if (results.length === 0) {
+    return 'No results were found for your search query. This could be due to DuckDuckGo\'s bot detection or the query returned no matches. Please try rephrasing your search or try again in a few minutes.';
+  }
+
+  let output = `Found ${results.length} search results:\n\n`;
+  
+  for (const result of results) {
+    output += `${result.position}. ${result.title}\n`;
+    output += `   URL: ${result.link}\n`;
+    output += `   Summary: ${result.snippet}\n\n`;
+  }
+
+  return output;
+}
+
+export interface SearchResult {
+  title: string;
+  link: string;
+  snippet: string;
+  position: number;
+}
