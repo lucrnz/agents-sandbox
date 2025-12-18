@@ -291,7 +291,12 @@ DB_FILE_NAME=sqlite.db
 # Optional: Server config
 PORT=3000
 HOST=localhost
+
+# Debug Mode
+DEBUG=true
 ```
+
+When `DEBUG=true`, agentic fetch requests generate detailed markdown files in the `.debug/` directory containing search results, URL analysis data, and execution details for debugging purposes.
 
 ## TypeScript Configuration
 

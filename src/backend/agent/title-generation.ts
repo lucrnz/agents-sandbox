@@ -1,6 +1,5 @@
-import { xai } from "@ai-sdk/xai";
 import { generateText } from "ai";
-import { MODEL_CONFIG, type ModelName } from "./model-config.js";
+import { smallModel } from "./model-config.js";
 
 /**
  * Generate conversation title using small model
@@ -8,7 +7,7 @@ import { MODEL_CONFIG, type ModelName } from "./model-config.js";
 export async function generateConversationTitle(content: string): Promise<string> {
   try {
     const { text } = await generateText({
-      model: xai("grok-4-1-fast-reasoning"), // Use Grok for titles
+      model: smallModel,
       prompt: `Generate a concise title (max 5 words) for this conversation:
 
 "${content}"
@@ -38,7 +37,7 @@ Title:`,
 export async function inferPageTitle(url: string): Promise<string> {
   try {
     const { text } = await generateText({
-      model: xai("grok-4-1-fast-reasoning"), // Use Grok for quick inference
+      model: smallModel, // Use small model for quick inference
       prompt: `Given this URL, infer the most likely page title. Be concise and professional.
 
 URL: ${url}
@@ -107,4 +106,48 @@ export function extractSearchKeywords(query: string): string[] {
     .split(/\s+/)
     .filter((word) => word.length > 2 && !stopWords.includes(word))
     .slice(0, 5); // Max 5 keywords
+}
+
+/**
+ * Generate a short, filename-safe description using the small model
+ */
+export async function generateShortFilenameDescription(content: string): Promise<string> {
+  try {
+    const { text } = await generateText({
+      model: smallModel,
+      prompt: `Create a very short filename-friendly description (max 3-4 words) for this content:
+
+"${content}"
+
+Requirements:
+- Max 3-4 words
+- Use only letters, numbers, and spaces
+- No special characters, quotes, or punctuation
+- Be concise and descriptive
+- Use common words that capture the essence
+
+Short description:`,
+      maxRetries: 1,
+    });
+
+    // Clean up the text to be filename-safe
+    const cleaned = text
+      .trim()
+      .replace(/[^a-zA-Z0-9\s]/g, "") // Remove special characters
+      .replace(/\s+/g, " ") // Collapse multiple spaces
+      .trim();
+
+    // If the model returned something empty or just spaces, use a fallback
+    if (!cleaned || cleaned.length === 0) {
+      const keywords = extractSearchKeywords(content);
+      return keywords.slice(0, 3).join(" ");
+    }
+
+    return cleaned;
+  } catch (error) {
+    console.error("Filename description generation failed:", error);
+    // Fallback to keywords
+    const keywords = extractSearchKeywords(content);
+    return keywords.slice(0, 3).join(" ");
+  }
 }

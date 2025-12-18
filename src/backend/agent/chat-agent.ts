@@ -1,6 +1,5 @@
 import { Experimental_Agent as Agent, stepCountIs } from "ai";
-import { xai } from "@ai-sdk/xai";
-import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { bigModel } from "./model-config.js";
 import { createAgenticFetchTool } from "./agentic-fetch.js";
 import { generateConversationTitle } from "./title-generation.js";
 
@@ -27,7 +26,7 @@ export class ChatAgent {
     console.log("[CHAT_AGENT] Initializing with tools:", { agentic_fetch: !!agenticFetchTool });
 
     this.agent = new Agent({
-      model: xai("grok-4-1-fast-reasoning"),
+      model: bigModel,
       system: `You are a helpful AI assistant. Be conversational, thoughtful, and provide detailed responses when appropriate.
       
 - Always be friendly and professional
