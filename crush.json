@@ -1,0 +1,23 @@
+{
+  "$schema": "https://charm.land/crush.json",
+  "lsp": {
+    "go": {
+      "command": "gopls",
+      "env": {
+        "GOTOOLCHAIN": "go1.25.5"
+      }
+    },
+    "typescript": {
+      "command": "bunx typescript-language-server",
+      "args": ["--stdio"]
+    }
+  },
+  "mcp": {
+    "filesystem": {
+      "type": "stdio",
+      "command": "bunx",
+      "args": ["@playwright/mcp@latest"],
+      "disabled": false
+    }
+  }
+}
