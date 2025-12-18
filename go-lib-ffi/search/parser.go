@@ -2,6 +2,7 @@ package search
 
 import (
 	"net/url"
+	"slices"
 	"strings"
 
 	"golang.org/x/net/html"
@@ -40,24 +41,22 @@ func ParseSearchResults(htmlStr string, maxResults int) []SearchResult {
 	// Find all div.result elements
 	var findResultDivs func(*html.Node)
 	findResultDivs = func(node *html.Node) {
-		if node.Type == html.ElementNode && node.Data == "div" {
-			// Check if this div has class="result"
-			for _, attr := range node.Attr {
-				if attr.Key == "class" && attr.Val == "result" {
-					// Parse this result
-					result := parseResultDiv(node)
-					if result.Title != "" && result.Link != "" && result.Link != "#" {
-						result.Position = position
-						results = append(results, result)
-						position++
-					}
-					break
-				}
+		if len(results) >= maxResults {
+			return
+		}
+
+		if node.Type == html.ElementNode && node.Data == "div" && hasClass(node, "result") {
+			// Parse this result
+			result := parseResultDiv(node)
+			if result.Title != "" && result.Link != "" && result.Link != "#" && !strings.Contains(result.Link, "y.js") {
+				result.Position = position
+				results = append(results, result)
+				position++
 			}
 		}
 
 		// Continue searching children
-		for child := node.FirstChild; child != nil; child = child.NextSibling {
+		for child := node.FirstChild; child != nil && len(results) < maxResults; child = child.NextSibling {
 			findResultDivs(child)
 		}
 	}
@@ -79,22 +78,17 @@ func parseResultDiv(div *html.Node) SearchResult {
 	// Find title link (a.result__a)
 	var findTitleLink func(*html.Node)
 	findTitleLink = func(node *html.Node) {
-		if node.Type == html.ElementNode && node.Data == "a" {
-			// Check if this link has class="result__a"
+		if node.Type == html.ElementNode && node.Data == "a" && hasClass(node, "result__a") {
+			// Extract title
+			result.Title = extractTextContent(node)
+			// Extract and clean URL
 			for _, attr := range node.Attr {
-				if attr.Key == "class" && attr.Val == "result__a" {
-					// Extract title
-					result.Title = extractTextContent(node)
-					// Extract and clean URL
-					for _, a := range node.Attr {
-						if a.Key == "href" {
-							result.Link = cleanDuckDuckGoURL(a.Val)
-							break
-						}
-					}
-					return
+				if attr.Key == "href" {
+					result.Link = cleanDuckDuckGoURL(attr.Val)
+					break
 				}
 			}
+			return
 		}
 
 		for child := node.FirstChild; child != nil; child = child.NextSibling {
@@ -105,14 +99,9 @@ func parseResultDiv(div *html.Node) SearchResult {
 	// Find snippet link (a.result__snippet)
 	var findSnippetLink func(*html.Node)
 	findSnippetLink = func(node *html.Node) {
-		if node.Type == html.ElementNode && node.Data == "a" {
-			// Check if this link has class="result__snippet"
-			for _, attr := range node.Attr {
-				if attr.Key == "class" && attr.Val == "result__snippet" {
-					result.Snippet = extractTextContent(node)
-					return
-				}
-			}
+		if node.Type == html.ElementNode && node.Data == "a" && hasClass(node, "result__snippet") {
+			result.Snippet = extractTextContent(node)
+			return
 		}
 
 		for child := node.FirstChild; child != nil; child = child.NextSibling {
@@ -165,4 +154,15 @@ func cleanDuckDuckGoURL(rawURL string) string {
 	}
 
 	return rawURL
+}
+
+// hasClass checks if an HTML node has a specific CSS class.
+// Handles elements with multiple classes by splitting on whitespace.
+func hasClass(n *html.Node, class string) bool {
+	for _, attr := range n.Attr {
+		if attr.Key == "class" {
+			return slices.Contains(strings.Fields(attr.Val), class)
+		}
+	}
+	return false
 }

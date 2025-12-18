@@ -151,6 +151,14 @@ function parseSearchResults(html: string, maxResults: number): SearchResult[] {
     console.log("[WEB_TOOLS] Using Go library for search result parsing");
     const results = goLib.parseSearchResults(html, maxResults);
     console.log("[WEB_TOOLS] Go library parsed", results.length, "results");
+
+    // Debug: Log when parsing might have failed
+    if (results.length === 0 && html.length > 1000) {
+      console.warn("[WEB_TOOLS] Parsing returned 0 results despite large HTML response");
+      console.warn("[WEB_TOOLS] First 500 chars of HTML:", html.substring(0, 500));
+      console.warn("[WEB_TOOLS] This likely indicates a parsing issue, not rate limiting");
+    }
+
     return results;
   } catch (error) {
     console.error("[WEB_TOOLS] Go library failed:", error);
