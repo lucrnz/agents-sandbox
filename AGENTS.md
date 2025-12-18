@@ -5,12 +5,14 @@
 ## Documentation Structure (IMPORTANT)
 
 ### Root Directory Markdown Files
+
 The root directory must contain **ONLY TWO** markdown files:
 
 1. **AGENTS.md** - This file. Main documentation for AI agents working in this codebase
 2. **README.md** - Human-readable project overview and user-facing documentation
 
 ### CLAUDE.md
+
 **CLAUDE.md** is exclusively for the Claude Code CLI tool. It must always be a **symbolic link** to AGENTS.md, not a separate file:
 
 ```bash
@@ -21,9 +23,11 @@ ln -s AGENTS.md CLAUDE.md
 **Never** edit CLAUDE.md directly - it should always point to AGENTS.md so both human and AI agents see consistent documentation.
 
 ### Documentation for Non-Humans
+
 All documentation intended for AI agents (implementation guides, architecture decisions, procedures) must live in the `.llm/docs/` directory, not in the root or other locations.
 
 **Examples:**
+
 - `.llm/docs/IMPLEMENTATION_GUIDES.md` - Technical implementation details for agents
 - `.llm/docs/ARCHITECTURE_DECISIONS.md` - Architecture rationale and decisions  
 - `.llm/docs/DEPLOYMENT_PROCEDURES.md` - Deployment and operational procedures
@@ -35,15 +39,17 @@ All documentation intended for AI agents (implementation guides, architecture de
 For complex features, refactoring, or non-trivial bug fixes, create structured implementation plans in `.llm/plans/`. Plans break down large tasks into executable steps with clear context, affected files, testing strategies, and potential risks.
 
 **Quick Reference:**
+
 - **Create plan:** `.llm/plans/PLAN_YYYYMMdd_DESCRIPTION.md`
 - **Execute:** Follow steps sequentially, mark completed with `[x]`
 - **Complete:** Move to `.llm/plans/done/` when finished
 
-See `.llm/plans/README.md` for complete guidelines on when to create plans, naming conventions, structure, and workflow.
+See `.llm/plans/README_TO_UNDERSTAND_HOW_TO_USE_PLANS.md` for complete guidelines on when to create plans, naming conventions, structure, and workflow.
 
 ## Development Commands
 
 ### Core Commands
+
 - **Development server**: `bun --hot src/backend/index.ts` or `bun run dev`
 - **Production server**: `NODE_ENV=production bun src/backend/index.ts` or `bun run start`
 - **Build**: `bun run build.ts` (with optional flags: `--outdir`, `--minify`, `--sourcemap`, etc.)
@@ -51,6 +57,7 @@ See `.llm/plans/README.md` for complete guidelines on when to create plans, nami
 - **Install dependencies**: `bun install`
 
 ### Build Script Options
+
 ```sh
 bun run build.ts --outdir=dist --minify --sourcemap=linked --external=react,react-dom
 ```
@@ -58,6 +65,7 @@ bun run build.ts --outdir=dist --minify --sourcemap=linked --external=react,reac
 ## Technology Stack
 
 ### Backend Framework
+
 - **Bun runtime** - Full Stack JavaScript runtime (alternative to Node.js)
 - **Bun.serve()** - Built-in HTTP/WebSocket server (no Express)
 - **Drizzle ORM** - SQLite database with `bun:sqlite`
@@ -65,6 +73,7 @@ bun run build.ts --outdir=dist --minify --sourcemap=linked --external=react,reac
 - **Agent Tools** - Built-in agentic fetch with web search capabilities
 
 ### Frontend Framework
+
 - **React 19** - Latest React with TypeScript
 - **Wouter** - Lightweight client-side routing (~2KB)
 - **Tailwind CSS v4** - Utility-first CSS framework
@@ -73,6 +82,7 @@ bun run build.ts --outdir=dist --minify --sourcemap=linked --external=react,reac
 - **Custom UI Components** - shadcn/ui style components in `src/frontend/components/ui/`
 
 ### Key Differences from Standard React
+
 - **No Vite/Webpack** - Bun's native bundler handles everything
 - **HTML imports** - Import `.tsx`, `.jsx`, `.css` files directly in HTML
 - **Hot Module Replacement** - Built into Bun's dev server
@@ -124,6 +134,7 @@ src/
 ## WebSocket Command System
 
 ### Architecture
+
 The app uses a typed WebSocket command system for client-server communication:
 
 1. **Commands** (Client → Server → Client)
@@ -140,6 +151,7 @@ The app uses a typed WebSocket command system for client-server communication:
 ### Adding New Commands
 
 1. **Define command in `src/shared/commands.ts`:**
+
 ```typescript
 export const MyCommand = registry.command(
   "my_command",
@@ -148,7 +160,8 @@ export const MyCommand = registry.command(
 );
 ```
 
-2. **Register handler in `src/backend/command-handlers.ts`:**
+1. **Register handler in `src/backend/command-handlers.ts`:**
+
 ```typescript
 commandHandlers.register(MyCommand, async (payload, context) => {
   const { ws, conversationId } = context;
@@ -157,7 +170,8 @@ commandHandlers.register(MyCommand, async (payload, context) => {
 });
 ```
 
-3. **Use in frontend with WebSocket hook:**
+1. **Use in frontend with WebSocket hook:**
+
 ```typescript
 const { sendCommand } = useWebSocket();
 const result = await sendCommand("my_command", { /* payload */ });
@@ -168,6 +182,7 @@ const result = await sendCommand("my_command", { /* payload */ });
 ### Tables
 
 **conversations**
+
 ```typescript
 {
   id: string (primary key)
@@ -178,6 +193,7 @@ const result = await sendCommand("my_command", { /* payload */ });
 ```
 
 **messages**
+
 ```typescript
 {
   id: number (primary key, auto-increment)
@@ -189,6 +205,7 @@ const result = await sendCommand("my_command", { /* payload */ });
 ```
 
 ### Database Commands
+
 ```sh
 # Generate migrations
 bunx drizzle-kit generate
@@ -203,12 +220,14 @@ bunx drizzle-kit studio
 ## AI Agent System
 
 ### Chat Agent (`src/backend/agent/chat-agent.ts`)
+
 - **Model**: xAI Grok-4-1-fast-reasoning
 - **Capabilities**: Natural language processing, web search, content analysis
 - **Tools**: `agentic_fetch` for web browsing/search
 - **Streaming**: Real-time response streaming with status updates
 
 ### Agentic Fetch Tool
+
 - **Search**: DuckDuckGo web search
 - **Browse**: Web page content extraction
 - **Status**: Real-time status updates during tool execution
@@ -217,12 +236,14 @@ bunx drizzle-kit studio
 ## Frontend Patterns
 
 ### Component Structure
+
 - **UI Components**: Use `class-variance-authority` (cva) for variants
 - **Styling**: Tailwind CSS with `tailwind-merge` and `clsx`
 - **Radix UI**: Headless components with custom styling
 - **Icons**: Lucide React icons
 
-### Example Component (`button.tsx`):
+### Example Component (`button.tsx`)
+
 ```typescript
 const buttonVariants = cva("base-classes", {
   variants: { variant: { ... }, size: { ... } },
@@ -236,6 +257,7 @@ function Button({ className, variant, size, asChild, ...props }) {
 ```
 
 ### Routing with Wouter
+
 ```typescript
 import { Route, Switch, Link } from "wouter";
 
@@ -249,6 +271,7 @@ import { Route, Switch, Link } from "wouter";
 ```
 
 ### WebSocket Hook Pattern
+
 ```typescript
 const { sendCommand, sendEvent, lastMessage, readyState } = useWebSocket();
 ```
@@ -256,6 +279,7 @@ const { sendCommand, sendEvent, lastMessage, readyState } = useWebSocket();
 ## Environment Variables
 
 Create `.env` file (copy from `.env.example`):
+
 ```bash
 # AI API Keys
 XAI_API_KEY=your_xai_api_key_here
@@ -272,12 +296,14 @@ HOST=localhost
 ## TypeScript Configuration
 
 **Key Settings:**
+
 - `target: "ESNext"`, `module: "Preserve"`, `jsx: "react-jsx"`
 - `moduleResolution: "bundler"` with `allowImportingTsExtensions: true`
 - `baseUrl: "."` with path mapping `@/*` → `./src/*`
 - Strict mode enabled with additional checks
 
 **Import Path Convention:**
+
 ```typescript
 import { Button } from "@/frontend/components/ui/button";
 import { cn } from "@/frontend/lib/utils";
@@ -286,6 +312,7 @@ import { cn } from "@/frontend/lib/utils";
 ## Testing
 
 No test suite currently configured. When adding tests:
+
 - Use `bun test` (Bun's built-in test runner)
 - Import from `bun:test` (not jest/vitest)
 
@@ -318,16 +345,19 @@ No test suite currently configured. When adding tests:
 ## Debugging Tips
 
 ### Backend
+
 - Console logs prefixed with `[COMMAND_HANDLER]`, `[CHAT_AGENT]`, etc.
 - WebSocket messages logged for debugging
 - AI tool execution status updates streamed
 
 ### Frontend
+
 - React DevTools supported
 - WebSocket connection state in `useWebSocket` hook
 - Component hot reloading preserves state when possible
 
 ### Database
+
 - SQLite DB file location in `.env` (`DB_FILE_NAME`)
 - Use Drizzle Studio for GUI inspection: `bunx drizzle-kit studio`
 - All queries in `src/backend/db/queries.ts`
