@@ -30,6 +30,17 @@ All documentation intended for AI agents (implementation guides, architecture de
 
 **Keep the root clean** - Only AGENTS.md, README.md, and the CLAUDE.md symlink belong in the root directory.
 
+## Implementation Plans
+
+For complex features, refactoring, or non-trivial bug fixes, create structured implementation plans in `.llm/plans/`. Plans break down large tasks into executable steps with clear context, affected files, testing strategies, and potential risks.
+
+**Quick Reference:**
+- **Create plan:** `.llm/plans/PLAN_YYYYMMdd_DESCRIPTION.md`
+- **Execute:** Follow steps sequentially, mark completed with `[x]`
+- **Complete:** Move to `.llm/plans/done/` when finished
+
+See `.llm/plans/README.md` for complete guidelines on when to create plans, naming conventions, structure, and workflow.
+
 ## Development Commands
 
 ### Core Commands
