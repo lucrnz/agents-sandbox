@@ -158,25 +158,6 @@ function parseSearchResults(html: string, maxResults: number): SearchResult[] {
   }
 }
 
-function cleanDuckDuckGoUrl(rawUrl: string): string {
-  console.log("[WEB_TOOLS] Cleaning DuckDuckGo URL:", rawUrl);
-  if (rawUrl && rawUrl.startsWith("//duckduckgo.com/l/?uddg=")) {
-    const match = rawUrl.match(/uddg=([^&]+)/);
-    if (match) {
-      try {
-        const cleaned = decodeURIComponent(match[1] || "");
-        console.log("[WEB_TOOLS] Cleaned URL:", cleaned);
-        return cleaned;
-      } catch {
-        console.log("[WEB_TOOLS] URL decode failed, returning original");
-        return rawUrl;
-      }
-    }
-  }
-  console.log("[WEB_TOOLS] URL is not a DuckDuckGo redirect, returning as-is");
-  return rawUrl;
-}
-
 export function formatSearchResults(results: SearchResult[]): string {
   if (results.length === 0) {
     return "No results were found for your search query. This could be due to DuckDuckGo's bot detection or the query returned no matches. Please try rephrasing your search or try again in a few minutes.";
