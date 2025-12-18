@@ -8,15 +8,16 @@
       }
     },
     "typescript": {
-      "command": "bunx typescript-language-server",
-      "args": ["--stdio"]
+      "command": "bunx",
+      "args": ["typescript-language-server", "--stdio"]
     }
   },
   "mcp": {
-    "filesystem": {
+    "playwright": {
       "type": "stdio",
       "command": "bunx",
-      "args": ["@playwright/mcp@latest"],
+      "args": ["@playwright/mcp"],
+      "disabled_tools": ["browser_take_screenshot", "browser_install", "browser_file_upload"],
       "disabled": false
     }
   }
