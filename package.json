@@ -7,7 +7,8 @@
     "dev": "bun --hot src/backend/index.ts",
     "start": "NODE_ENV=production bun src/backend/index.ts",
     "build": "bun run build.ts",
-    "typecheck": "bunx tsc --noEmit"
+    "typecheck": "bunx tsc --noEmit",
+    "prepare": "lefthook install"
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.87",
