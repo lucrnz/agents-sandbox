@@ -1,0 +1,13 @@
+pre-commit:
+  parallel: true
+  jobs:
+    - name: format TypeScript and TSX files
+      glob: "*.{ts,tsx,html,css}"
+      run: bunx prettier --write {staged_files}
+      stage_fixed: true
+
+    - name: format Go files
+      root: go-lib-ffi
+      glob: "*.go"
+      run: gofmt -w {staged_files}
+      stage_fixed: true

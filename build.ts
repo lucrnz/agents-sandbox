@@ -33,8 +33,7 @@ Example:
   process.exit(0);
 }
 
-const toCamelCase = (str: string): string =>
-  str.replace(/-([a-z])/g, (g) => g[1]!.toUpperCase());
+const toCamelCase = (str: string): string => str.replace(/-([a-z])/g, (g) => g[1]!.toUpperCase());
 
 const parseValue = (value: string): any => {
   if (value === "true") return true;
@@ -65,10 +64,7 @@ function parseArgs(): Partial<Bun.BuildConfig> {
       continue;
     }
 
-    if (
-      !arg.includes("=") &&
-      (i === args.length - 1 || args[i + 1]?.startsWith("--"))
-    ) {
+    if (!arg.includes("=") && (i === args.length - 1 || args[i + 1]?.startsWith("--"))) {
       const key = toCamelCase(arg.slice(2));
       config[key] = true;
       continue;
@@ -114,7 +110,40 @@ const formatFileSize = (bytes: number): string => {
   return `${size.toFixed(2)} ${units[unitIndex]}`;
 };
 
+async function buildGoLib() {
+  console.log("🔨 Building Go library...");
+  const goDir = path.join(process.cwd(), "go-lib-ffi");
+
+  if (!existsSync(goDir)) {
+    console.log("⚠️  Go library directory not found, skipping");
+    return;
+  }
+
+  try {
+    const proc = Bun.spawn({
+      cmd: ["make", "build"],
+      cwd: goDir,
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+
+    const exitCode = await proc.exited;
+    if (exitCode === 0) {
+      console.log("✅ Go library built successfully");
+    } else {
+      console.error("❌ Go library build failed");
+      const stderr = await new Response(proc.stderr).text();
+      console.error(stderr);
+    }
+  } catch (error) {
+    console.error("❌ Error building Go library:", error);
+  }
+}
+
 console.log("\n🚀 Starting build process...\n");
+
+// Build Go library first
+await buildGoLib();
 
 const cliConfig = parseArgs();
 const outdir = cliConfig.outdir || path.join(process.cwd(), "dist");
@@ -130,9 +159,7 @@ const entrypoints = [...new Bun.Glob("**.html").scanSync("src")]
   .map((a) => path.resolve("src", a))
   .filter((dir) => !dir.includes("node_modules"));
 console.log(
-  `📄 Found ${entrypoints.length} HTML ${
-    entrypoints.length === 1 ? "file" : "files"
-  } to process\n`
+  `📄 Found ${entrypoints.length} HTML ${entrypoints.length === 1 ? "file" : "files"} to process\n`,
 );
 
 const result = await Bun.build({
