@@ -46,9 +46,11 @@ export class ChatAgent {
         // Check for tool calls (tool execution starting)
         if (lastStep?.toolCalls && lastStep.toolCalls.length > 0) {
           for (const toolCall of lastStep.toolCalls) {
-            console.log(`[CHAT_AGENT] Tool call detected: ${toolCall.toolName}`, toolCall.args);
+            // Type assertion to access args property
+            const call = toolCall as any;
+            console.log(`[CHAT_AGENT] Tool call detected: ${toolCall.toolName}`, call.args);
             if (params?.onToolCall) {
-              params.onToolCall(toolCall.toolName, toolCall.args);
+              params.onToolCall(toolCall.toolName, call.args);
             }
           }
         }
@@ -56,9 +58,11 @@ export class ChatAgent {
         // Check for tool results (tool execution completed)
         if (lastStep?.toolResults && lastStep.toolResults.length > 0) {
           for (const toolResult of lastStep.toolResults) {
-            console.log(`[CHAT_AGENT] Tool result: ${toolResult.toolName}`, toolResult.result);
+            // Type assertion to access result/error properties
+            const result = toolResult as any;
+            console.log(`[CHAT_AGENT] Tool result: ${toolResult.toolName}`, result.result);
             if (params?.onToolResult) {
-              params.onToolResult(toolResult.toolName, toolResult.result, toolResult.error);
+              params.onToolResult(toolResult.toolName, result.result, result.error);
             }
           }
         }

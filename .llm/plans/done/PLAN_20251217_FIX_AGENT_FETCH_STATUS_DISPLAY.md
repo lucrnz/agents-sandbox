@@ -86,36 +86,36 @@ Use the AI SDK's `prepareStep` callback to intercept tool execution and emit Web
 
 ### Phase 1: Update ChatAgent Class
 
-- [ ] Modify `ChatAgent` constructor to accept optional callbacks:
+- [x] Modify `ChatAgent` constructor to accept optional callbacks:
   - `onToolCall?(toolName: string, args: any): void`
   - `onToolResult?(toolName: string, result: any, error?: Error): void`
-- [ ] Add `prepareStep` callback to `Agent` configuration
-- [ ] In `prepareStep`, check the last step for tool calls and results
-- [ ] Call appropriate callbacks when tool calls/results are detected
-- [ ] Import necessary types: `PrepareStepParams` from 'ai'
+- [x] Add `prepareStep` callback to `Agent` configuration
+- [x] In `prepareStep`, check the last step for tool calls and results
+- [x] Call appropriate callbacks when tool calls/results are detected
+- [x] Import necessary types: `PrepareStepParams` from 'ai'
 
 ### Phase 2: Update Command Handler
 
-- [ ] Modify `command-handlers.ts` to import the status generation functions:
+- [x] Modify `command-handlers.ts` to import the status generation functions:
   - `generateStatusMessage` from `./agent/agentic-fetch.js`
-- [ ] Update `SendMessage` handler to pass callbacks to `ChatAgent`
-- [ ] Create `emitToolEvent` helper function to send WebSocket events
-- [ ] In `onToolCall` callback:
+- [x] Update `SendMessage` handler to pass callbacks to `ChatAgent`
+- [x] Create `emitToolEvent` helper function to send WebSocket events
+- [x] In `onToolCall` callback:
   - Generate status message from tool arguments
   - Create `AgentToolStartEvent` message
   - Send via WebSocket to client
-- [ ] In `onToolResult` callback:
+- [x] In `onToolResult` callback:
   - Create `AgentToolCompleteEvent` (or `AgentToolErrorEvent` if error)
   - Send via WebSocket to client
 
 ### Phase 3: Enhance Status Messages
 
-- [ ] Improve `generateStatusMessage` in `agentic-fetch.ts`:
+- [x] Improve `generateStatusMessage` in `agentic-fetch.ts`:
   - For search: extract keywords and show "Searching for {keywords}..."
   - For URL browsing: extract domain or page title and show "Browsing {title/domain}..."
   - Use `inferPageTitle` function from `title-generation.ts`
-- [ ] Add helper function to extract search keywords from tool arguments
-- [ ] Ensure status messages are concise and informative
+- [x] Add helper function to extract search keywords from tool arguments
+- [x] Ensure status messages are concise and informative
 
 ### Phase 4: Update Frontend Event Handling
 
