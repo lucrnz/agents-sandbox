@@ -15,6 +15,7 @@ import {
   AgentToolStartEvent,
   AgentToolCompleteEvent,
   AgentToolErrorEvent,
+  ChatAgentErrorEvent,
 } from "../shared/commands";
 import {
   getOrCreateConversation,
@@ -140,7 +141,7 @@ commandHandlers.register(SendMessage, async (payload, context) => {
           console.log(`[COMMAND_HANDLER] Tool call detected: ${toolName}`, args);
 
           if (toolName === "agentic_fetch") {
-            const statusMessage = generateStatusMessage(args);
+            const statusMessage = generateStatusMessage(args || null);
 
             // Emit tool start event
             const startEvent = createEventMessage(AgentToolStartEvent.name, {
@@ -183,6 +184,21 @@ commandHandlers.register(SendMessage, async (payload, context) => {
             ws.send(JSON.stringify(completeEvent));
             console.log(`[COMMAND_HANDLER] Emitted agent_tool_complete event for ${toolName}`);
           }
+        },
+        onCriticalError: (error, originalError) => {
+          console.log(`[COMMAND_HANDLER] Critical ChatAgent error detected:`, error.message);
+
+          // Emit ChatAgentError event
+          const criticalErrorEvent = createEventMessage(ChatAgentErrorEvent.name, {
+            conversationId: conversation.id,
+            error: error.message,
+            originalError,
+            canRetry: true,
+            timestamp: new Date().toISOString(),
+          });
+
+          ws.send(JSON.stringify(criticalErrorEvent));
+          console.log(`[COMMAND_HANDLER] Emitted chat_agent_error event`);
         },
       });
 

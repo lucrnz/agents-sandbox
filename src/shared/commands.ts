@@ -119,6 +119,17 @@ export const AgentToolErrorEvent = registry.event(
   }),
 );
 
+export const ChatAgentErrorEvent = registry.event(
+  "chat_agent_error",
+  z.object({
+    conversationId: z.string(),
+    error: z.string(),
+    originalError: z.string().optional(),
+    canRetry: z.boolean().default(true),
+    timestamp: z.string().datetime(),
+  }),
+);
+
 // ============================================================================
 // Type Exports
 // ============================================================================
@@ -139,3 +150,4 @@ export type SystemNotificationPayload = z.infer<typeof SystemNotificationEvent.p
 export type AgentToolStartPayload = z.infer<typeof AgentToolStartEvent.payloadSchema>;
 export type AgentToolCompletePayload = z.infer<typeof AgentToolCompleteEvent.payloadSchema>;
 export type AgentToolErrorPayload = z.infer<typeof AgentToolErrorEvent.payloadSchema>;
+export type ChatAgentErrorPayload = z.infer<typeof ChatAgentErrorEvent.payloadSchema>;

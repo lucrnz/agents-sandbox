@@ -78,7 +78,12 @@ Returns: Search results, page analysis, or error messages with clear next steps.
 }
 
 // Helper function to generate status messages for UI
-export function generateStatusMessage({ prompt, url }: AgenticFetchParams): string {
+export function generateStatusMessage(params: AgenticFetchParams | null): string {
+  if (!params) {
+    return "Preparing search...";
+  }
+
+  const { prompt, url } = params;
   if (url) {
     return `Browsing ${url}`;
   } else {

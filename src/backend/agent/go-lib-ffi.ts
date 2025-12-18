@@ -170,13 +170,33 @@ export class GoLibFFIWrapper {
         // Ignore errors from FreeString
       }
 
-      const goResults: GoSearchResult[] = JSON.parse(result);
+      // Handle null or undefined result
+      if (!result || result.trim() === "") {
+        console.warn("[GO_LIB_FFI] ParseSearchResults returned empty string");
+        return [];
+      }
+
+      let goResults: GoSearchResult[];
+      try {
+        goResults = JSON.parse(result);
+      } catch (parseError) {
+        console.error("[GO_LIB_FFI] Failed to parse JSON:", parseError);
+        console.error("[GO_LIB_FFI] Raw result:", result);
+        return [];
+      }
+
+      // Ensure we have an array
+      if (!Array.isArray(goResults)) {
+        console.warn("[GO_LIB_FFI] ParseSearchResults did not return an array");
+        return [];
+      }
+
       // Transform from Go format (Title, Link, Snippet, Position) to TS format (title, link, snippet, position)
       return goResults.map((r) => ({
-        title: r.Title,
-        link: r.Link,
-        snippet: r.Snippet,
-        position: r.Position,
+        title: r.Title || "",
+        link: r.Link || "",
+        snippet: r.Snippet || "",
+        position: r.Position || 0,
       }));
     } catch (error) {
       console.error("[GO_LIB_FFI] Error in parseSearchResults:", error);

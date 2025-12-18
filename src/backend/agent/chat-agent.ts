@@ -9,11 +9,19 @@ import { generateConversationTitle } from "./title-generation.js";
  */
 export class ChatAgent {
   private agent: Agent<{ agentic_fetch: ReturnType<typeof createAgenticFetchTool> }>;
+  private params?: {
+    onToolCall?: (toolName: string, args: any) => void;
+    onToolResult?: (toolName: string, result: any, error?: Error) => void;
+    onCriticalError?: (error: Error, originalError?: string) => void;
+  };
 
   constructor(params?: {
     onToolCall?: (toolName: string, args: any) => void;
     onToolResult?: (toolName: string, result: any, error?: Error) => void;
+    onCriticalError?: (error: Error, originalError?: string) => void;
   }) {
+    // Store params for use in error handling
+    this.params = params;
     // Initialize the agent with xAI model (currently using Grok)
     const agenticFetchTool = createAgenticFetchTool();
     console.log("[CHAT_AGENT] Initializing with tools:", { agentic_fetch: !!agenticFetchTool });
@@ -92,7 +100,19 @@ export class ChatAgent {
       }
     } catch (error) {
       console.error("[CHAT_AGENT] Error generating response:", error);
-      yield "Sorry, I encountered an error while generating a response. Please try again.";
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      const originalError = error instanceof Error ? error.stack : String(error);
+
+      // Notify about critical error via callback
+      if (this.params?.onCriticalError) {
+        this.params.onCriticalError(
+          new Error("Failed to generate AI response: " + errorMessage),
+          originalError,
+        );
+      }
+
+      // Still yield a friendly error message to the stream
+      yield "❌ Sorry, I encountered an error while generating a response. Please try again.";
     }
   }
 
@@ -107,7 +127,18 @@ export class ChatAgent {
       return result.text;
     } catch (error) {
       console.error("Error generating response:", error);
-      return "Sorry, I encountered an error while generating a response. Please try again.";
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      const originalError = error instanceof Error ? error.stack : String(error);
+
+      // Notify about critical error via callback
+      if (this.params?.onCriticalError) {
+        this.params.onCriticalError(
+          new Error("Failed to generate AI response: " + errorMessage),
+          originalError,
+        );
+      }
+
+      return "❌ Sorry, I encountered an error while generating a response. Please try again.";
     }
   }
 

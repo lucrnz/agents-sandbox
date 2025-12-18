@@ -17,12 +17,14 @@ import {
   AgentToolStartEvent,
   AgentToolCompleteEvent,
   AgentToolErrorEvent,
+  ChatAgentErrorEvent,
   type AIResponsePayload,
   type ConversationUpdatedPayload,
   type SystemNotificationPayload,
   type AgentToolStartPayload,
   type AgentToolCompletePayload,
   type AgentToolErrorPayload,
+  type ChatAgentErrorPayload,
 } from "@/shared/commands";
 
 interface Message {
@@ -34,6 +36,10 @@ interface Message {
     status: "start" | "complete" | "error";
     description?: string;
     error?: string;
+  };
+  agentError?: {
+    error: string;
+    canRetry: boolean;
   };
 }
 
@@ -51,6 +57,8 @@ export default function ChatPage() {
   const [currentConversationId, setCurrentConversationId] = useState<string>();
   const [currentConversationTitle, setCurrentConversationTitle] = useState("New Chat");
   const [hasSelectedConversation, setHasSelectedConversation] = useState(false);
+  const [lastFailedMessage, setLastFailedMessage] = useState<string>("");
+  const [hasAgentError, setHasAgentError] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -162,6 +170,25 @@ export default function ChatPage() {
       }
     });
 
+    const unsubChatAgentError = on<ChatAgentErrorPayload>(ChatAgentErrorEvent, (payload) => {
+      if (payload.conversationId === currentConversationId) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            sender: "system",
+            text: `❌ Critical Error: ${payload.error}`,
+            timestamp: payload.timestamp,
+            agentError: {
+              error: payload.error,
+              canRetry: payload.canRetry,
+            },
+          },
+        ]);
+        setIsLoading(false);
+        setHasAgentError(true);
+      }
+    });
+
     return () => {
       unsubAIResponse();
       unsubConversationUpdated();
@@ -169,6 +196,7 @@ export default function ChatPage() {
       unsubAgentToolStart();
       unsubAgentToolComplete();
       unsubAgentToolError();
+      unsubChatAgentError();
     };
   }, [on, currentConversationId]);
 
@@ -227,19 +255,24 @@ export default function ChatPage() {
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || !isConnected) return;
 
+    // Store the message in case we need to retry
+    const messageContent = inputMessage;
+    setLastFailedMessage("");
+
     const userMessage: Message = {
       sender: "user",
-      text: inputMessage,
+      text: messageContent,
       timestamp: new Date().toISOString(),
     };
 
     setMessages((prev) => [...prev, userMessage]);
     setInputMessage("");
     setIsLoading(true);
+    setHasAgentError(false);
 
     try {
       const result = await send(SendMessage, {
-        content: inputMessage,
+        content: messageContent,
         conversationId: currentConversationId,
       });
 
@@ -250,12 +283,18 @@ export default function ChatPage() {
     } catch (error) {
       console.error("Failed to send message:", error);
       setIsLoading(false);
+      setLastFailedMessage(messageContent);
+      setHasAgentError(true);
       setMessages((prev) => [
         ...prev,
         {
           sender: "system",
-          text: `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
+          text: `❌ Error: ${error instanceof Error ? error.message : "Unknown error"}`,
           timestamp: new Date().toISOString(),
+          agentError: {
+            error: error instanceof Error ? error.message : "Unknown error",
+            canRetry: true,
+          },
         },
       ]);
     }
@@ -291,10 +330,45 @@ export default function ChatPage() {
     }
   };
 
-  const handleKeyUp = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
+  const handleRetryMessage = async () => {
+    if (!lastFailedMessage.trim()) return;
+
+    const userMessage: Message = {
+      sender: "user",
+      text: lastFailedMessage,
+      timestamp: new Date().toISOString(),
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    setLastFailedMessage("");
+    setIsLoading(true);
+    setHasAgentError(false);
+
+    try {
+      const result = await send(SendMessage, {
+        content: lastFailedMessage,
+        conversationId: currentConversationId,
+      });
+
+      // Update conversation ID if this was first message
+      if (!currentConversationId) {
+        setCurrentConversationId(result.conversationId);
+      }
+    } catch (error) {
+      console.error("Failed to retry message:", error);
+      setIsLoading(false);
+      setMessages((prev) => [
+        ...prev,
+        {
+          sender: "system",
+          text: `❌ Retry failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+          timestamp: new Date().toISOString(),
+          agentError: {
+            error: error instanceof Error ? error.message : "Unknown error",
+            canRetry: true,
+          },
+        },
+      ]);
     }
   };
 
@@ -437,13 +511,29 @@ export default function ChatPage() {
                                           ? "border-l-4 border-green-500 bg-green-100 text-green-900 dark:bg-green-900/30 dark:text-green-100"
                                           : "border-l-4 border-blue-500 bg-blue-100 text-blue-900 dark:bg-blue-900/30 dark:text-blue-100"
                                     }`
-                                  : "bg-muted/70 text-muted-foreground max-w-xs rounded-lg p-3 md:max-w-md lg:max-w-lg xl:max-w-xl"
+                                  : message.agentError
+                                    ? "border-l-4 border-red-500 bg-red-100 text-red-900 dark:bg-red-900/30 dark:text-red-100"
+                                    : "bg-muted/70 text-muted-foreground max-w-xs rounded-lg p-3 md:max-w-md lg:max-w-lg xl:max-w-xl"
                           }`}
                         >
                           {message.sender === "assistant" ? (
                             <MarkdownRenderer content={message.text} />
                           ) : (
-                            <p className="whitespace-pre-wrap">{message.text}</p>
+                            <>
+                              <p className="whitespace-pre-wrap">{message.text}</p>
+                              {message.agentError && message.agentError.canRetry && (
+                                <div className="mt-2 flex gap-2">
+                                  <Button
+                                    onClick={handleRetryMessage}
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-xs"
+                                  >
+                                    Try Again
+                                  </Button>
+                                </div>
+                              )}
+                            </>
                           )}
                           <p
                             className={`mt-1 text-xs ${
