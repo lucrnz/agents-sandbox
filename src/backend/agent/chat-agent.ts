@@ -10,7 +10,10 @@ import { generateConversationTitle } from "./title-generation.js";
 export class ChatAgent {
   private agent: Agent<{ agentic_fetch: ReturnType<typeof createAgenticFetchTool> }>;
 
-  constructor() {
+  constructor(params?: {
+    onToolCall?: (toolName: string, args: any) => void;
+    onToolResult?: (toolName: string, result: any, error?: Error) => void;
+  }) {
     // Initialize the agent with xAI model (currently using Grok)
     const agenticFetchTool = createAgenticFetchTool();
     console.log("[CHAT_AGENT] Initializing with tools:", { agentic_fetch: !!agenticFetchTool });
@@ -33,6 +36,35 @@ export class ChatAgent {
 
       // Stop conditions - reasonable default
       stopWhen: stepCountIs(10),
+
+      // Track tool execution for real-time status updates
+      prepareStep: async ({ steps }) => {
+        if (!steps || steps.length === 0) return {};
+
+        const lastStep = steps[steps.length - 1];
+
+        // Check for tool calls (tool execution starting)
+        if (lastStep?.toolCalls && lastStep.toolCalls.length > 0) {
+          for (const toolCall of lastStep.toolCalls) {
+            console.log(`[CHAT_AGENT] Tool call detected: ${toolCall.toolName}`, toolCall.args);
+            if (params?.onToolCall) {
+              params.onToolCall(toolCall.toolName, toolCall.args);
+            }
+          }
+        }
+
+        // Check for tool results (tool execution completed)
+        if (lastStep?.toolResults && lastStep.toolResults.length > 0) {
+          for (const toolResult of lastStep.toolResults) {
+            console.log(`[CHAT_AGENT] Tool result: ${toolResult.toolName}`, toolResult.result);
+            if (params?.onToolResult) {
+              params.onToolResult(toolResult.toolName, toolResult.result, toolResult.error);
+            }
+          }
+        }
+
+        return {}; // Continue with default settings
+      },
     });
   }
 
