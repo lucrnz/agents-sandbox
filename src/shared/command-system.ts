@@ -55,11 +55,7 @@ export interface EventMessage<T = unknown> {
 }
 
 // All possible WebSocket messages
-export type WebSocketMessage =
-  | CommandMessage
-  | CommandResult
-  | CommandError
-  | EventMessage;
+export type WebSocketMessage = CommandMessage | CommandResult | CommandError | EventMessage;
 
 // ============================================================================
 // Command Registry
@@ -72,17 +68,14 @@ class Registry {
   command<TReq, TRes>(
     name: string,
     requestSchema: z.ZodType<TReq>,
-    responseSchema: z.ZodType<TRes>
+    responseSchema: z.ZodType<TRes>,
   ): CommandDef<TReq, TRes> {
     const cmd = { name, requestSchema, responseSchema };
     this.commands.set(name, cmd);
     return cmd;
   }
 
-  event<TPayload>(
-    name: string,
-    payloadSchema: z.ZodType<TPayload>
-  ): EventDef<TPayload> {
+  event<TPayload>(name: string, payloadSchema: z.ZodType<TPayload>): EventDef<TPayload> {
     const evt = { name, payloadSchema };
     this.events.set(name, evt);
     return evt;
@@ -170,7 +163,7 @@ export const WebSocketMessageSchema = z.discriminatedUnion("kind", [
 export function createCommandMessage<T>(
   command: string,
   payload: T,
-  correlationId: string = crypto.randomUUID()
+  correlationId: string = crypto.randomUUID(),
 ): CommandMessage<T> {
   return {
     kind: "command",
@@ -184,7 +177,7 @@ export function createCommandMessage<T>(
 export function createCommandResult<T>(
   command: string,
   correlationId: string,
-  payload: T
+  payload: T,
 ): CommandResult<T> {
   return {
     kind: "result",
@@ -200,7 +193,7 @@ export function createCommandError(
   correlationId: string,
   code: string,
   message: string,
-  details?: unknown
+  details?: unknown,
 ): CommandError {
   return {
     kind: "error",

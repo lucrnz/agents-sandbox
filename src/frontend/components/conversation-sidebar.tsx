@@ -17,23 +17,19 @@ export default function ConversationSidebar({
   onNewConversation,
 }: ConversationSidebarProps) {
   return (
-    <div className="w-64 bg-card border-r flex flex-col h-full">
-      <div className="p-4 border-b">
-        <Button 
-          onClick={onNewConversation}
-          className="w-full justify-center"
-          variant="default"
-        >
+    <div className="bg-card flex h-full w-64 flex-col border-r">
+      <div className="border-b p-4">
+        <Button onClick={onNewConversation} className="w-full justify-center" variant="default">
           New Conversation
         </Button>
       </div>
-      
-      <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
-        <h3 className="text-sm font-semibold text-muted-foreground mb-2 px-2">
+
+      <div className="custom-scrollbar flex-1 overflow-y-auto p-2">
+        <h3 className="text-muted-foreground mb-2 px-2 text-sm font-semibold">
           Recent Conversations
         </h3>
         {conversations.length === 0 ? (
-          <p className="text-sm text-muted-foreground px-2 py-4 text-center">
+          <p className="text-muted-foreground px-2 py-4 text-center text-sm">
             No conversations yet
           </p>
         ) : (
@@ -41,17 +37,19 @@ export default function ConversationSidebar({
             <button
               key={conversation.id}
               onClick={() => onLoadConversation(conversation.id)}
-              className={`w-full text-left p-3 rounded-lg mb-1 transition-colors hover:bg-muted/50 ${
+              className={`hover:bg-muted/50 mb-1 w-full rounded-lg p-3 text-left transition-colors ${
                 currentConversationId === conversation.id
-                  ? "bg-primary/10 border-l-2 border-primary"
+                  ? "bg-primary/10 border-primary border-l-2"
                   : "border-l-2 border-transparent"
               }`}
             >
-              <h4 className="font-medium text-sm text-foreground truncate">
-                {conversation.title}
-              </h4>
-              <p className="text-xs text-muted-foreground mt-1">
-                {new Date(conversation.updatedAt).toLocaleDateString()} {new Date(conversation.updatedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+              <h4 className="text-foreground truncate text-sm font-medium">{conversation.title}</h4>
+              <p className="text-muted-foreground mt-1 text-xs">
+                {new Date(conversation.updatedAt).toLocaleDateString()}{" "}
+                {new Date(conversation.updatedAt).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
               </p>
             </button>
           ))

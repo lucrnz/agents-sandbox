@@ -1,13 +1,13 @@
-import { db } from './setup';
-import { conversationsTable, messagesTable } from './schema';
-import { eq, desc } from 'drizzle-orm';
-import { randomUUID } from 'crypto';
+import { db } from "./setup";
+import { conversationsTable, messagesTable } from "./schema";
+import { eq, desc } from "drizzle-orm";
+import { randomUUID } from "crypto";
 
 // Conversation operations
 export async function createConversation(title?: string) {
   const conversationId = randomUUID();
   const conversationTitle = title || `New chat ${new Date().toLocaleString()}`;
-  
+
   const result = await db
     .insert(conversationsTable)
     .values({
@@ -15,7 +15,7 @@ export async function createConversation(title?: string) {
       title: conversationTitle,
     })
     .returning();
-  
+
   return result[0];
 }
 
@@ -24,15 +24,12 @@ export async function getConversation(conversationId: string) {
     .select()
     .from(conversationsTable)
     .where(eq(conversationsTable.id, conversationId));
-  
+
   return conversation[0] || null;
 }
 
 export async function getAllConversations() {
-  return await db
-    .select()
-    .from(conversationsTable)
-    .orderBy(desc(conversationsTable.updatedAt));
+  return await db.select().from(conversationsTable).orderBy(desc(conversationsTable.updatedAt));
 }
 
 export async function getConversationsWithMessages() {
@@ -55,21 +52,19 @@ export async function updateConversation(conversationId: string, data: { title?:
     .set({ ...data, updatedAt: new Date() })
     .where(eq(conversationsTable.id, conversationId))
     .returning();
-  
+
   return result[0];
 }
 
 export async function deleteConversation(conversationId: string) {
-  await db
-    .delete(conversationsTable)
-    .where(eq(conversationsTable.id, conversationId));
+  await db.delete(conversationsTable).where(eq(conversationsTable.id, conversationId));
 }
 
 // Message operations
 export async function addMessage(
   conversationId: string,
-  role: 'user' | 'assistant',
-  content: string
+  role: "user" | "assistant",
+  content: string,
 ) {
   const result = await db
     .insert(messagesTable)
@@ -79,13 +74,13 @@ export async function addMessage(
       content,
     })
     .returning();
-  
+
   // Update conversation's updatedAt
   await db
     .update(conversationsTable)
     .set({ updatedAt: new Date() })
     .where(eq(conversationsTable.id, conversationId));
-  
+
   return result[0];
 }
 
@@ -103,16 +98,16 @@ export async function updateMessage(messageId: number, content: string) {
     .set({ content })
     .where(eq(messagesTable.id, messageId))
     .returning();
-  
+
   return result[0];
 }
 
 export async function getConversationWithMessages(conversationId: string) {
   const conversation = await getConversation(conversationId);
   if (!conversation) return null;
-  
+
   const messages = await getMessages(conversationId);
-  
+
   return {
     ...conversation,
     messages,
@@ -125,7 +120,7 @@ export async function getOrCreateConversation(conversationId?: string) {
     const conversation = await getConversation(conversationId);
     if (conversation) return conversation;
   }
-  
+
   // Create new conversation if none exists or ID not found
   return await createConversation();
 }

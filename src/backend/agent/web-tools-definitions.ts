@@ -1,18 +1,28 @@
-import { z } from 'zod';
-import { tool } from 'ai';
-import { searchDuckDuckGo, fetchUrlAndConvert, formatSearchResults, type SearchResult } from './web-tools.js';
+import { z } from "zod";
+import { tool } from "ai";
+import {
+  searchDuckDuckGo,
+  fetchUrlAndConvert,
+  formatSearchResults,
+  type SearchResult,
+} from "./web-tools.js";
 
 export const WebSearchParamsSchema = z.object({
-  query: z.string().describe('The search query to find information on the web'),
-  maxResults: z.number().int().min(1).max(20).optional().default(10).describe(
-    'Maximum number of results to return (default: 10, max: 20)'
-  ),
+  query: z.string().describe("The search query to find information on the web"),
+  maxResults: z
+    .number()
+    .int()
+    .min(1)
+    .max(20)
+    .optional()
+    .default(10)
+    .describe("Maximum number of results to return (default: 10, max: 20)"),
 });
 
 export type WebSearchParams = z.infer<typeof WebSearchParamsSchema>;
 
 export const WebFetchParamsSchema = z.object({
-  url: z.string().url().describe('The URL to fetch content from'),
+  url: z.string().url().describe("The URL to fetch content from"),
 });
 
 export type WebFetchParams = z.infer<typeof WebFetchParamsSchema>;

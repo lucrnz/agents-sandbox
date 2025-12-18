@@ -1,8 +1,8 @@
-import { Experimental_Agent as Agent, stepCountIs } from 'ai';
-import { xai } from '@ai-sdk/xai';
-import { createOpenRouter } from '@openrouter/ai-sdk-provider';
-import { createAgenticFetchTool } from './agentic-fetch.js';
-import { generateConversationTitle } from './title-generation.js';
+import { Experimental_Agent as Agent, stepCountIs } from "ai";
+import { xai } from "@ai-sdk/xai";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { createAgenticFetchTool } from "./agentic-fetch.js";
+import { generateConversationTitle } from "./title-generation.js";
 
 /**
  * Simple ChatAgent configuration with agentic fetch tool
@@ -13,10 +13,10 @@ export class ChatAgent {
   constructor() {
     // Initialize the agent with xAI model (currently using Grok)
     const agenticFetchTool = createAgenticFetchTool();
-    console.log('[CHAT_AGENT] Initializing with tools:', { agentic_fetch: !!agenticFetchTool });
-    
+    console.log("[CHAT_AGENT] Initializing with tools:", { agentic_fetch: !!agenticFetchTool });
+
     this.agent = new Agent({
-      model: xai('grok-4-1-fast-reasoning'),
+      model: xai("grok-4-1-fast-reasoning"),
       system: `You are a helpful AI assistant. Be conversational, thoughtful, and provide detailed responses when appropriate.
       
 - Always be friendly and professional
@@ -25,12 +25,12 @@ export class ChatAgent {
 - When you don't know something, admit it honestly
 - Try to be concise but thorough in your responses
 - When you need current information from the web, use the agentic_fetch tool to search or fetch content`,
-      
+
       // Tools object - now includes agentic_fetch
       tools: {
         agentic_fetch: agenticFetchTool,
       },
-      
+
       // Stop conditions - reasonable default
       stopWhen: stepCountIs(10),
     });
@@ -41,19 +41,22 @@ export class ChatAgent {
    * @param prompt The user's message
    * @returns Stream of text chunks
    */
-  async* generateResponse(prompt: string): AsyncGenerator<string, void, unknown> {
-    console.log('[CHAT_AGENT] generateResponse called with:', prompt.substring(0, 100) + (prompt.length > 100 ? '...' : ''));
+  async *generateResponse(prompt: string): AsyncGenerator<string, void, unknown> {
+    console.log(
+      "[CHAT_AGENT] generateResponse called with:",
+      prompt.substring(0, 100) + (prompt.length > 100 ? "..." : ""),
+    );
     try {
       const result = await this.agent.stream({ prompt });
-      
+
       // AI SDK handles tool execution automatically with onInputStart callbacks
       // Just stream the response text
       for await (const chunk of result.textStream) {
         yield chunk;
       }
     } catch (error) {
-      console.error('[CHAT_AGENT] Error generating response:', error);
-      yield 'Sorry, I encountered an error while generating a response. Please try again.';
+      console.error("[CHAT_AGENT] Error generating response:", error);
+      yield "Sorry, I encountered an error while generating a response. Please try again.";
     }
   }
 
@@ -67,8 +70,8 @@ export class ChatAgent {
       const result = await this.agent.generate({ prompt });
       return result.text;
     } catch (error) {
-      console.error('Error generating response:', error);
-      return 'Sorry, I encountered an error while generating a response. Please try again.';
+      console.error("Error generating response:", error);
+      return "Sorry, I encountered an error while generating a response. Please try again.";
     }
   }
 

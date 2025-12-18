@@ -10,41 +10,33 @@ import {
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-background p-8">
+    <div className="bg-background min-h-screen p-8">
       <header className="mb-8">
-        <h1 className="text-4xl font-bold text-foreground">AI Command Center</h1>
-        <p className="text-muted-foreground mt-2">
-          Welcome to the AI sandbox environment
-        </p>
+        <h1 className="text-foreground text-4xl font-bold">AI Command Center</h1>
+        <p className="text-muted-foreground mt-2">Welcome to the AI sandbox environment</p>
       </header>
 
-      <main className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <Card className="hover:shadow-md transition-shadow">
+      <main className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <Card className="transition-shadow hover:shadow-md">
           <CardHeader>
             <CardTitle>AI Chatbot</CardTitle>
-            <CardDescription>
-              Interact with AI models via WebSocket
-            </CardDescription>
+            <CardDescription>Interact with AI models via WebSocket</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Real-time conversation with Grok
-            </p>
+            <p className="text-muted-foreground mb-4 text-sm">Real-time conversation with Grok</p>
             <Link href="/chat">
               <Button className="w-full">Launch Chatbot</Button>
             </Link>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow">
+        <Card className="transition-shadow hover:shadow-md">
           <CardHeader>
             <CardTitle>Todo App</CardTitle>
             <CardDescription>Sandbox application</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Example application for testing
-            </p>
+            <p className="text-muted-foreground mb-4 text-sm">Example application for testing</p>
             <Link href="/sandbox/todo-app">
               <Button className="w-full" variant="secondary">
                 Todo App
@@ -54,8 +46,8 @@ export default function HomePage() {
         </Card>
       </main>
 
-      <footer className="mt-12 pt-8 border-t border-border">
-        <p className="text-sm text-muted-foreground">
+      <footer className="border-border mt-12 border-t pt-8">
+        <p className="text-muted-foreground text-sm">
           AI Command Center - WebSocket-based AI Sandbox
         </p>
       </footer>

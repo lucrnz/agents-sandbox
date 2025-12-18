@@ -32,7 +32,7 @@ export const SendMessage = registry.command(
     messageId: z.number(),
     conversationId: z.string(),
     timestamp: z.string().datetime(),
-  })
+  }),
 );
 
 export const LoadConversation = registry.command(
@@ -44,7 +44,7 @@ export const LoadConversation = registry.command(
     conversationId: z.string(),
     title: z.string(),
     messages: z.array(MessageSchema),
-  })
+  }),
 );
 
 export const GetConversations = registry.command(
@@ -52,7 +52,7 @@ export const GetConversations = registry.command(
   z.object({}),
   z.object({
     conversations: z.array(ConversationSchema),
-  })
+  }),
 );
 
 // ============================================================================
@@ -66,7 +66,7 @@ export const AIResponseEvent = registry.event(
     conversationId: z.string(),
     content: z.string(),
     timestamp: z.string().datetime(),
-  })
+  }),
 );
 
 export const ConversationUpdatedEvent = registry.event(
@@ -74,7 +74,7 @@ export const ConversationUpdatedEvent = registry.event(
   z.object({
     conversationId: z.string(),
     title: z.string(),
-  })
+  }),
 );
 
 export const SystemNotificationEvent = registry.event(
@@ -82,7 +82,7 @@ export const SystemNotificationEvent = registry.event(
   z.object({
     level: z.enum(["info", "warning", "error"]),
     message: z.string(),
-  })
+  }),
 );
 
 // ============================================================================
@@ -96,7 +96,7 @@ export const AgentToolStartEvent = registry.event(
     toolName: z.string(),
     description: z.string().optional(),
     timestamp: z.string().datetime(),
-  })
+  }),
 );
 
 export const AgentToolCompleteEvent = registry.event(
@@ -106,7 +106,7 @@ export const AgentToolCompleteEvent = registry.event(
     toolName: z.string(),
     result: z.any().optional(),
     timestamp: z.string().datetime(),
-  })
+  }),
 );
 
 export const AgentToolErrorEvent = registry.event(
@@ -116,7 +116,7 @@ export const AgentToolErrorEvent = registry.event(
     toolName: z.string(),
     error: z.string(),
     timestamp: z.string().datetime(),
-  })
+  }),
 );
 
 // ============================================================================

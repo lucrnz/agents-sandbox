@@ -49,8 +49,7 @@ export default function ChatPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<string>();
-  const [currentConversationTitle, setCurrentConversationTitle] =
-    useState("New Chat");
+  const [currentConversationTitle, setCurrentConversationTitle] = useState("New Chat");
   const [hasSelectedConversation, setHasSelectedConversation] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -69,20 +68,17 @@ export default function ChatPage() {
   // ============================================================================
 
   useEffect(() => {
-    const unsubAIResponse = on<AIResponsePayload>(
-      AIResponseEvent,
-      (payload) => {
-        setMessages((prev) => [
-          ...prev,
-          {
-            sender: "assistant",
-            text: payload.content,
-            timestamp: payload.timestamp,
-          },
-        ]);
-        setIsLoading(false);
-      },
-    );
+    const unsubAIResponse = on<AIResponsePayload>(AIResponseEvent, (payload) => {
+      setMessages((prev) => [
+        ...prev,
+        {
+          sender: "assistant",
+          text: payload.content,
+          timestamp: payload.timestamp,
+        },
+      ]);
+      setIsLoading(false);
+    });
 
     const unsubConversationUpdated = on<ConversationUpdatedPayload>(
       ConversationUpdatedEvent,
@@ -110,26 +106,23 @@ export default function ChatPage() {
     );
 
     // Agent tool event handlers (for future use)
-    const unsubAgentToolStart = on<AgentToolStartPayload>(
-      AgentToolStartEvent,
-      (payload) => {
-        if (payload.conversationId === currentConversationId) {
-          setMessages((prev) => [
-            ...prev,
-            {
-              sender: "system",
-              text: `🔧 Using tool: ${payload.toolName}${payload.description ? ` - ${payload.description}` : ''}`,
-              timestamp: payload.timestamp,
-              toolInfo: {
-                toolName: payload.toolName,
-                status: "start",
-                description: payload.description,
-              },
+    const unsubAgentToolStart = on<AgentToolStartPayload>(AgentToolStartEvent, (payload) => {
+      if (payload.conversationId === currentConversationId) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            sender: "system",
+            text: `🔧 Using tool: ${payload.toolName}${payload.description ? ` - ${payload.description}` : ""}`,
+            timestamp: payload.timestamp,
+            toolInfo: {
+              toolName: payload.toolName,
+              status: "start",
+              description: payload.description,
             },
-          ]);
-        }
-      },
-    );
+          },
+        ]);
+      }
+    });
 
     const unsubAgentToolComplete = on<AgentToolCompletePayload>(
       AgentToolCompleteEvent,
@@ -151,26 +144,23 @@ export default function ChatPage() {
       },
     );
 
-    const unsubAgentToolError = on<AgentToolErrorPayload>(
-      AgentToolErrorEvent,
-      (payload) => {
-        if (payload.conversationId === currentConversationId) {
-          setMessages((prev) => [
-            ...prev,
-            {
-              sender: "system",
-              text: `❌ Error in ${payload.toolName}: ${payload.error}`,
-              timestamp: payload.timestamp,
-              toolInfo: {
-                toolName: payload.toolName,
-                status: "error",
-                error: payload.error,
-              },
+    const unsubAgentToolError = on<AgentToolErrorPayload>(AgentToolErrorEvent, (payload) => {
+      if (payload.conversationId === currentConversationId) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            sender: "system",
+            text: `❌ Error in ${payload.toolName}: ${payload.error}`,
+            timestamp: payload.timestamp,
+            toolInfo: {
+              toolName: payload.toolName,
+              status: "error",
+              error: payload.error,
             },
-          ]);
-        }
-      },
-    );
+          },
+        ]);
+      }
+    });
 
     return () => {
       unsubAIResponse();
@@ -206,10 +196,10 @@ export default function ChatPage() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInputMessage(e.target.value);
-    
+
     // Auto-resize textarea
     if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = "auto";
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
     }
   };
@@ -264,9 +254,7 @@ export default function ChatPage() {
         ...prev,
         {
           sender: "system",
-          text: `Error: ${
-            error instanceof Error ? error.message : "Unknown error"
-          }`,
+          text: `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
           timestamp: new Date().toISOString(),
         },
       ]);
@@ -336,7 +324,7 @@ export default function ChatPage() {
   // ============================================================================
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="bg-background flex h-screen">
       {hasSelectedConversation && (
         <ConversationSidebar
           conversations={conversations}
@@ -346,27 +334,22 @@ export default function ChatPage() {
         />
       )}
 
-      <div className="flex-1 flex flex-col min-h-0">
-        <header className="bg-card shadow-sm border-b px-4 py-5 flex items-center justify-between flex-shrink-0">
-          <h1 className="text-xl font-bold text-foreground">
+      <div className="flex min-h-0 flex-1 flex-col">
+        <header className="bg-card flex flex-shrink-0 items-center justify-between border-b px-4 py-5 shadow-sm">
+          <h1 className="text-foreground text-xl font-bold">
             {currentConversationTitle} - AI Chat
           </h1>
           <div className="flex items-center gap-2">
             <span
               data-status={status.status}
-              className="w-2 h-2 rounded-full
-                data-[status=connected]:bg-green-500 data-[status=connected]:dark:bg-green-600
-                data-[status=connecting]:bg-yellow-500 data-[status=connecting]:dark:bg-yellow-600
-                data-[status=reconnecting]:bg-orange-500 data-[status=reconnecting]:dark:bg-orange-600
-                data-[status=failed]:bg-red-500 data-[status=failed]:dark:bg-red-600
-                data-[status=disconnected]:bg-gray-500 data-[status=disconnected]:dark:bg-gray-600"
+              className="h-2 w-2 rounded-full data-[status=connected]:bg-green-500 data-[status=connecting]:bg-yellow-500 data-[status=disconnected]:bg-gray-500 data-[status=failed]:bg-red-500 data-[status=reconnecting]:bg-orange-500 data-[status=connected]:dark:bg-green-600 data-[status=connecting]:dark:bg-yellow-600 data-[status=disconnected]:dark:bg-gray-600 data-[status=failed]:dark:bg-red-600 data-[status=reconnecting]:dark:bg-orange-600"
             ></span>
-            <span className="text-sm text-muted-foreground">{status.text}</span>
+            <span className="text-muted-foreground text-sm">{status.text}</span>
           </div>
         </header>
 
         {connectionState === "failed" && (
-          <div className="mx-4 mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg flex items-center justify-between flex-shrink-0">
+          <div className="bg-destructive/10 border-destructive/20 mx-4 mt-4 flex flex-shrink-0 items-center justify-between rounded-lg border p-4">
             <p className="text-destructive">Connection failed</p>
             <Button onClick={reconnect} variant="outline" size="sm">
               Retry Connection
@@ -374,19 +357,17 @@ export default function ChatPage() {
           </div>
         )}
 
-        <div className="flex-1 overflow-hidden p-4 min-h-0">
-          <div className="h-full flex flex-col py-2 px-1 shadow-md rounded-xl border border-neutral-600/50 dark:border-neutral-500/50">
+        <div className="min-h-0 flex-1 overflow-hidden p-4">
+          <div className="flex h-full flex-col rounded-xl border border-neutral-600/50 px-1 py-2 shadow-md dark:border-neutral-500/50">
             {!hasSelectedConversation ? (
-              <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-                <div className="max-w-4xl mx-auto">
-                  <h2 className="text-2xl font-bold text-foreground mb-6">
-                    Choose a conversation
-                  </h2>
+              <div className="custom-scrollbar flex-1 overflow-y-auto p-6">
+                <div className="mx-auto max-w-4xl">
+                  <h2 className="text-foreground mb-6 text-2xl font-bold">Choose a conversation</h2>
 
                   <div className="mb-8">
                     <Button
                       onClick={handleNewConversation}
-                      className="w-full sm:w-auto px-6 py-3 text-lg"
+                      className="w-full px-6 py-3 text-lg sm:w-auto"
                       size="lg"
                       disabled={!isConnected}
                     >
@@ -396,47 +377,39 @@ export default function ChatPage() {
 
                   {conversations.length > 0 ? (
                     <div>
-                      <h3 className="text-lg font-semibold text-muted-foreground mb-4">
+                      <h3 className="text-muted-foreground mb-4 text-lg font-semibold">
                         Recent conversations
                       </h3>
                       <div className="space-y-3">
                         {conversations.map((conversation) => (
                           <div
                             key={conversation.id}
-                            onClick={() =>
-                              handleLoadConversation(conversation.id)
-                            }
-                            className="p-4 bg-card border border-border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                            onClick={() => handleLoadConversation(conversation.id)}
+                            className="bg-card border-border hover:bg-muted/50 cursor-pointer rounded-lg border p-4 transition-colors"
                           >
-                            <h4 className="font-medium text-foreground truncate">
+                            <h4 className="text-foreground truncate font-medium">
                               {conversation.title}
                             </h4>
-                            <p className="text-sm text-muted-foreground mt-1">
-                              {new Date(
-                                conversation.updatedAt,
-                              ).toLocaleString()}
+                            <p className="text-muted-foreground mt-1 text-sm">
+                              {new Date(conversation.updatedAt).toLocaleString()}
                             </p>
                           </div>
                         ))}
                       </div>
                     </div>
                   ) : (
-                    <div className="text-center py-12">
-                      <p className="text-muted-foreground">
-                        No previous conversations found.
-                      </p>
+                    <div className="py-12 text-center">
+                      <p className="text-muted-foreground">No previous conversations found.</p>
                     </div>
                   )}
                 </div>
               </div>
             ) : (
               <>
-                <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+                <div className="custom-scrollbar flex-1 space-y-4 overflow-y-auto p-4">
                   {messages.length === 0 ? (
-                    <div className="flex items-center justify-center h-full">
-                      <p className="text-muted-foreground">
-                        Start a conversation with AI...
-                      </p>
+                    <div className="flex h-full items-center justify-center">
+                      <p className="text-muted-foreground">Start a conversation with AI...</p>
                     </div>
                   ) : (
                     messages.map((message, index) => (
@@ -453,29 +426,27 @@ export default function ChatPage() {
                         <div
                           className={`${
                             message.sender === "user"
-                              ? "max-w-xs md:max-w-md lg:max-w-lg xl:max-w-xl rounded-lg p-3 bg-gray-200/60 dark:bg-neutral-700/50 text-foreground"
+                              ? "text-foreground max-w-xs rounded-lg bg-gray-200/60 p-3 md:max-w-md lg:max-w-lg xl:max-w-xl dark:bg-neutral-700/50"
                               : message.sender === "assistant"
-                                ? "max-w-2xl xl:max-w-3xl p-4 text-foreground"
-                                : message.toolInfo 
-                                  ? `max-w-xs md:max-w-md lg:max-w-lg xl:max-w-xl rounded-lg p-3 ${
-                                      message.toolInfo.status === "error" 
-                                        ? "bg-red-100 dark:bg-red-900/30 border-l-4 border-red-500 text-red-900 dark:text-red-100"
+                                ? "text-foreground max-w-2xl p-4 xl:max-w-3xl"
+                                : message.toolInfo
+                                  ? `max-w-xs rounded-lg p-3 md:max-w-md lg:max-w-lg xl:max-w-xl ${
+                                      message.toolInfo.status === "error"
+                                        ? "border-l-4 border-red-500 bg-red-100 text-red-900 dark:bg-red-900/30 dark:text-red-100"
                                         : message.toolInfo.status === "complete"
-                                          ? "bg-green-100 dark:bg-green-900/30 border-l-4 border-green-500 text-green-900 dark:text-green-100"
-                                          : "bg-blue-100 dark:bg-blue-900/30 border-l-4 border-blue-500 text-blue-900 dark:text-blue-100"
+                                          ? "border-l-4 border-green-500 bg-green-100 text-green-900 dark:bg-green-900/30 dark:text-green-100"
+                                          : "border-l-4 border-blue-500 bg-blue-100 text-blue-900 dark:bg-blue-900/30 dark:text-blue-100"
                                     }`
-                                  : "max-w-xs md:max-w-md lg:max-w-lg xl:max-w-xl rounded-lg p-3 bg-muted/70 text-muted-foreground"
+                                  : "bg-muted/70 text-muted-foreground max-w-xs rounded-lg p-3 md:max-w-md lg:max-w-lg xl:max-w-xl"
                           }`}
                         >
                           {message.sender === "assistant" ? (
                             <MarkdownRenderer content={message.text} />
                           ) : (
-                            <p className="whitespace-pre-wrap">
-                              {message.text}
-                            </p>
+                            <p className="whitespace-pre-wrap">{message.text}</p>
                           )}
                           <p
-                            className={`text-xs mt-1 ${
+                            className={`mt-1 text-xs ${
                               message.sender === "assistant"
                                 ? "text-muted-foreground text-center"
                                 : "text-muted-foreground text-right"
@@ -489,7 +460,7 @@ export default function ChatPage() {
                   )}
                   {isLoading && (
                     <div className="flex justify-center">
-                      <div className="max-w-2xl xl:max-w-3xl p-4 text-foreground">
+                      <div className="text-foreground max-w-2xl p-4 xl:max-w-3xl">
                         <p>Thinking...</p>
                       </div>
                     </div>
@@ -497,8 +468,8 @@ export default function ChatPage() {
                   <div ref={messagesEndRef} />
                 </div>
 
-                <div className="border-t p-3 bg-card">
-                  <div className="flex gap-2 items-end">
+                <div className="bg-card border-t p-3">
+                  <div className="flex items-end gap-2">
                     <Textarea
                       ref={textareaRef}
                       value={inputMessage}
@@ -506,15 +477,13 @@ export default function ChatPage() {
                       onKeyDown={handleKeyDown}
                       placeholder="Type your message..."
                       disabled={!isConnected || isLoading}
-                      className="flex-1 resize-none min-h-[40px] max-h-[120px]"
+                      className="max-h-[120px] min-h-[40px] flex-1 resize-none"
                       rows={1}
                     />
                     <Button
                       onClick={handleSendMessage}
-                      disabled={
-                        !isConnected || isLoading || !inputMessage.trim()
-                      }
-                      className="rounded-full p-2 h-10 w-10"
+                      disabled={!isConnected || isLoading || !inputMessage.trim()}
+                      className="h-10 w-10 rounded-full p-2"
                       aria-label="Send"
                     >
                       <ArrowUp className="h-4 w-4" />

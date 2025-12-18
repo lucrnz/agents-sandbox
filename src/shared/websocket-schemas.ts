@@ -23,7 +23,7 @@ export const GetConversationsSchema = z.object({
   type: z.literal("get_conversations"),
 });
 
-// Server to Client Messages  
+// Server to Client Messages
 export const SystemMessageSchema = z.object({
   type: z.literal("system"),
   message: z.string(),
@@ -42,21 +42,25 @@ export const ConversationLoadedSchema = z.object({
   type: z.literal("conversation_loaded"),
   conversationId: z.string(),
   title: z.string(),
-  messages: z.array(z.object({
-    id: z.number(),
-    role: z.enum(["user", "assistant"]),
-    content: z.string(),
-    createdAt: z.string().datetime(),
-  })),
+  messages: z.array(
+    z.object({
+      id: z.number(),
+      role: z.enum(["user", "assistant"]),
+      content: z.string(),
+      createdAt: z.string().datetime(),
+    }),
+  ),
 });
 
 export const ConversationsListSchema = z.object({
   type: z.literal("conversations_list"),
-  conversations: z.array(z.object({
-    id: z.string(),
-    title: z.string(),
-    updatedAt: z.string().datetime(),
-  })),
+  conversations: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      updatedAt: z.string().datetime(),
+    }),
+  ),
 });
 
 // Individual conversation schema
@@ -83,7 +87,7 @@ export const OutgoingMessageSchema = z.discriminatedUnion("type", [
 // All possible messages (for client-side validation of incoming)
 export const AnyMessageSchema = z.discriminatedUnion("type", [
   UserMessageSchema,
-  SystemMessageSchema, 
+  SystemMessageSchema,
   AIResponseSchema,
   LoadConversationSchema,
   GetConversationsSchema,
@@ -127,7 +131,11 @@ export const createGetConversations = (): GetConversations => {
   });
 };
 
-export const createSystemMessage = (message: string, error = false, conversationId?: string): SystemMessage => {
+export const createSystemMessage = (
+  message: string,
+  error = false,
+  conversationId?: string,
+): SystemMessage => {
   return SystemMessageSchema.parse({
     type: "system",
     message,
@@ -148,7 +156,7 @@ export const createAIResponse = (content: string, conversationId: string): AIRes
 export const createConversationLoaded = (
   conversationId: string,
   title: string,
-  messages: any[]
+  messages: any[],
 ): ConversationLoaded => {
   return ConversationLoadedSchema.parse({
     type: "conversation_loaded",

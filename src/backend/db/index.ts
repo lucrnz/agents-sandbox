@@ -1,7 +1,7 @@
-import { Database } from 'bun:sqlite';
-import { drizzle } from 'drizzle-orm/bun-sqlite';
-import * as schema from './schema';
-import { 
+import { Database } from "bun:sqlite";
+import { drizzle } from "drizzle-orm/bun-sqlite";
+import * as schema from "./schema";
+import {
   createConversation,
   getConversation,
   getAllConversations,
@@ -12,10 +12,10 @@ import {
   getMessages,
   updateMessage,
   getConversationWithMessages,
-  getOrCreateConversation
-} from './queries';
+  getOrCreateConversation,
+} from "./queries";
 
-const sqlite = new Database(process.env.DB_FILE_NAME || 'sqlite.db');
+const sqlite = new Database(process.env.DB_FILE_NAME || "sqlite.db");
 export const db = drizzle(sqlite, { schema });
 
 // Re-export all query functions
@@ -30,5 +30,5 @@ export {
   getMessages,
   updateMessage,
   getConversationWithMessages,
-  getOrCreateConversation
+  getOrCreateConversation,
 };

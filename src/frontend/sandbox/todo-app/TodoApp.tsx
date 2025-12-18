@@ -26,16 +26,14 @@ export function TodoApp() {
   };
 
   return (
-    <div className="container mx-auto p-8 text-center relative z-10">
+    <div className="relative z-10 container mx-auto p-8 text-center">
       <Card>
         <CardHeader className="gap-4">
           <CardTitle className="text-3xl font-bold">Todo App</CardTitle>
-          <CardDescription>
-            A simple todo application built with React
-          </CardDescription>
+          <CardDescription>A simple todo application built with React</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-2 mb-4">
+          <div className="mb-4 flex gap-2">
             <Input
               type="text"
               value={newTodo}
@@ -54,14 +52,10 @@ export function TodoApp() {
                 {todos.map((todo, index) => (
                   <li
                     key={index}
-                    className="flex justify-between items-center p-2 border rounded bg-card"
+                    className="bg-card flex items-center justify-between rounded border p-2"
                   >
                     <span>{todo}</span>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => removeTodo(index)}
-                    >
+                    <Button variant="destructive" size="sm" onClick={() => removeTodo(index)}>
                       Remove
                     </Button>
                   </li>

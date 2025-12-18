@@ -8,11 +8,11 @@ import "./index.css";
 export function GlobalLayout({ children }: { children: React.ReactNode }) {
   useLayoutEffect(() => {
     const applySystemTheme = () => {
-      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
       if (isDark) {
-        document.documentElement.classList.add('dark');
+        document.documentElement.classList.add("dark");
       } else {
-        document.documentElement.classList.remove('dark');
+        document.documentElement.classList.remove("dark");
       }
     };
 
@@ -20,11 +20,11 @@ export function GlobalLayout({ children }: { children: React.ReactNode }) {
     applySystemTheme();
 
     // Listen for system theme changes
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    mediaQuery.addEventListener('change', applySystemTheme);
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    mediaQuery.addEventListener("change", applySystemTheme);
 
     return () => {
-      mediaQuery.removeEventListener('change', applySystemTheme);
+      mediaQuery.removeEventListener("change", applySystemTheme);
     };
   }, []);
 

@@ -245,7 +245,7 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
         }
       });
     },
-    []
+    [],
   );
 
   // ============================================================================

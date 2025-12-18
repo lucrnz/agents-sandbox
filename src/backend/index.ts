@@ -65,7 +65,7 @@ const server = serve<{ conversationId?: string }>({
               command.correlationId,
               "COMMAND_FAILED",
               error instanceof Error ? error.message : "Unknown error",
-              error
+              error,
             );
             ws.send(JSON.stringify(errorResponse));
           }
@@ -83,6 +83,4 @@ const server = serve<{ conversationId?: string }>({
 });
 
 console.log(`🚀 Server running at ${server.url}`);
-console.log(
-  `🔌 WebSocket server available at ws://${server.hostname}:${server.port}`
-);
+console.log(`🔌 WebSocket server available at ws://${server.hostname}:${server.port}`);

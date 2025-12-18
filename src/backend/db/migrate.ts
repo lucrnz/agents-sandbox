@@ -1,37 +1,37 @@
-import { Database } from 'bun:sqlite';
-import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
-import { drizzle } from 'drizzle-orm/bun-sqlite';
-import { readFileSync, readdirSync } from 'fs';
-import { join } from 'path';
+import { Database } from "bun:sqlite";
+import { migrate } from "drizzle-orm/bun-sqlite/migrator";
+import { drizzle } from "drizzle-orm/bun-sqlite";
+import { readFileSync, readdirSync } from "fs";
+import { join } from "path";
 
 export async function runMigrations() {
-  const sqlite = new Database(process.env.DB_FILE_NAME || 'sqlite.db');
+  const sqlite = new Database(process.env.DB_FILE_NAME || "sqlite.db");
   const db = drizzle(sqlite);
 
   try {
     // Check if migrations folder exists and has files
-    const migrationsPath = './drizzle';
+    const migrationsPath = "./drizzle";
     let migrationFiles: string[] = [];
-    
+
     try {
       migrationFiles = readdirSync(migrationsPath)
-        .filter((file: string) => file.endsWith('.sql'))
+        .filter((file: string) => file.endsWith(".sql"))
         .sort();
     } catch (error) {
-      console.log('No migrations folder found, creating...');
+      console.log("No migrations folder found, creating...");
     }
 
     if (migrationFiles.length === 0) {
       // If no migrations exist, create schema directly
-      console.log('No migrations found, applying schema directly...');
+      console.log("No migrations found, applying schema directly...");
       applySchemaDirectly(sqlite);
     } else {
       // Run migrations
-      await db.run(readFileSync(join(migrationsPath, migrationFiles[0] || ''), 'utf-8'));
-      console.log('Migration completed');
+      await db.run(readFileSync(join(migrationsPath, migrationFiles[0] || ""), "utf-8"));
+      console.log("Migration completed");
     }
   } catch (error) {
-    console.error('Migration failed:', error);
+    console.error("Migration failed:", error);
   } finally {
     sqlite.close();
   }
@@ -61,7 +61,7 @@ function applySchemaDirectly(sqlite: Database) {
     )
   `);
 
-  console.log('Database schema created successfully');
+  console.log("Database schema created successfully");
 }
 
 // Generate migration files manually using schema
