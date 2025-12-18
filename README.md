@@ -1,21 +1,52 @@
-# bun-react-tailwind-shadcn-template
+# AI Command Center
 
-To install dependencies:
+A sandbox for training AI agents to interact with UI elements.
 
-```bash
-bun install
-```
+## Quickstart
 
-To start a development server:
+1. **Setup env** (for AI):
 
-```bash
-bun dev
-```
+   ```bash
+   cp .env.example .env
+   # Add XAI_API_KEY=your_key
+   ```
 
-To run for production:
+2. **Install**:
 
-```bash
-bun start
-```
+   ```bash
+   bun install
+   ```
 
-This project was created using `bun init` in bun v1.3.4. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+3. **Dev server**:
+
+   ```bash
+   bun dev
+   ```
+
+   Visit http://localhost:3000
+
+## Scripts
+
+| Command | Purpose |
+|---------|---------|
+| `bun dev` | Development |
+| `bun start` | Production |
+| `bun build` | Build |
+| `bun typecheck` | Type check |
+
+## Tech
+
+- Bun (runtime/server)
+- React 19 + Tailwind 4 + Wouter
+- Drizzle ORM (SQLite)
+- xAI Grok agent w/ web tools
+- Go FFI for HTML processing
+
+## Features
+
+- AI chat w/ tool use
+- Web search/fetch
+- Todo app sandbox
+- Conv history
+
+[AGENTS.md] Developer guide.
