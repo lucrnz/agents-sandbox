@@ -1,4 +1,4 @@
-import { db } from "./setup";
+import { db } from "./db";
 import { conversationsTable, messagesTable } from "./schema";
 import { eq, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";

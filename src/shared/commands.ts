@@ -134,6 +134,9 @@ export const ChatAgentErrorEvent = registry.event(
 // Type Exports
 // ============================================================================
 
+export type Message = z.infer<typeof MessageSchema>;
+export type Conversation = z.infer<typeof ConversationSchema>;
+
 export type SendMessageRequest = z.infer<typeof SendMessage.requestSchema>;
 export type SendMessageResponse = z.infer<typeof SendMessage.responseSchema>;
 

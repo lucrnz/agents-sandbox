@@ -1,11 +1,5 @@
 import { z } from "zod";
 import { tool } from "ai";
-import {
-  searchDuckDuckGo,
-  fetchUrlAndConvert,
-  formatSearchResults,
-  type SearchResult,
-} from "./web-tools.js";
 
 export const WebSearchParamsSchema = z.object({
   query: z.string().describe("The search query to find information on the web"),

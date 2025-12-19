@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/frontend/components/ui/button";
 import { Card } from "@/frontend/components/ui/card";
-import type { ConversationsList, Conversation } from "@/shared/websocket-schemas";
+import type { Conversation } from "@/shared/commands";
 
 interface ConversationSidebarProps {
   conversations: Conversation[];

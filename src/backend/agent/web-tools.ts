@@ -1,4 +1,4 @@
-import { getGoLibFFI, type SearchResult } from "./go-lib-ffi";
+import { getGoLibFFI, type SearchResult } from "../go-lib-ffi";
 
 export type { SearchResult };
 

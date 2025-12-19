@@ -7,6 +7,7 @@ interface GoLibFFISymbols {
   CleanHTML: (html: CString) => CString;
   ConvertHTMLToMarkdown: (html: CString) => CString;
   ParseSearchResults: (html: CString, maxResults: number) => CString;
+  StripMarkdown: (markdown: CString) => CString;
   FreeString: (str: CString) => void;
   GetLibraryVersion: () => CString;
 }
@@ -81,6 +82,10 @@ export class GoLibFFIWrapper {
         },
         ParseSearchResults: {
           args: [FFIType.cstring, FFIType.i32],
+          returns: FFIType.cstring,
+        },
+        StripMarkdown: {
+          args: [FFIType.cstring],
           returns: FFIType.cstring,
         },
         FreeString: {
@@ -200,6 +205,28 @@ export class GoLibFFIWrapper {
       }));
     } catch (error) {
       console.error("[GO_LIB_FFI] Error in parseSearchResults:", error);
+      throw error;
+    }
+  }
+
+  public stripMarkdown(markdown: string): string {
+    if (!this.isAvailable()) {
+      throw new Error("Go library not available");
+    }
+
+    try {
+      const buffer = Buffer.from(markdown + "\0");
+      const resultPtr = (this.lib!.symbols.StripMarkdown as any)(buffer);
+      const result = resultPtr ? resultPtr.toString() : "";
+      // Free the pointer (ignore errors if already freed)
+      try {
+        (this.lib!.symbols.FreeString as any)(resultPtr);
+      } catch (e) {
+        // Ignore errors from FreeString
+      }
+      return result;
+    } catch (error) {
+      console.error("[GO_LIB_FFI] Error in stripMarkdown:", error);
       throw error;
     }
   }

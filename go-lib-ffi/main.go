@@ -10,6 +10,7 @@ import (
 	"unsafe"
 
 	"go-lib-ffi/html"
+	"go-lib-ffi/markdown"
 	"go-lib-ffi/search"
 )
 
@@ -70,6 +71,22 @@ func ParseSearchResults(htmlStr *C.char, maxResults C.int) *C.char {
 	return C.CString(string(jsonBytes))
 }
 
+// StripMarkdown converts markdown text to plain text by removing all formatting.
+// Preserves semantic content (link text, image alt text, code) and basic structure.
+// The returned string must be freed by calling FreeString.
+// Returns empty string on error.
+//
+//export StripMarkdown
+func StripMarkdown(markdownStr *C.char) *C.char {
+	if markdownStr == nil {
+		return C.CString("")
+	}
+
+	goMarkdown := C.GoString(markdownStr)
+	plainText := markdown.StripMarkdown(goMarkdown)
+	return C.CString(plainText)
+}
+
 // FreeString frees memory allocated by functions returning *C.char.
 // Must be called on all returned strings to prevent memory leaks.
 //
@@ -85,7 +102,7 @@ func FreeString(str *C.char) {
 //
 //export GetLibraryVersion
 func GetLibraryVersion() *C.char {
-	return C.CString("1.0.0")
+	return C.CString("1.1.0")
 }
 
 func main() {

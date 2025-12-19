@@ -1,29 +1,46 @@
-import { generateText } from "ai";
+import { generateText, Output } from "ai";
 import { smallModel } from "./model-config.js";
+import z from "zod";
+import { getGoLibFFI } from "../go-lib-ffi.js";
 
 /**
  * Generate conversation title using small model
  */
 export async function generateConversationTitle(content: string): Promise<string> {
   try {
-    const { text } = await generateText({
+    const goLib = getGoLibFFI();
+    if (!goLib) {
+      throw new Error("Go library not available for title generation");
+    }
+
+    const {
+      output: { title: rawTitleResult },
+    } = await generateText({
       model: smallModel,
-      prompt: `Generate a concise title (max 5 words) for this conversation:
-
-"${content}"
-
-Requirements:
-- Maximum 5 words
-- Captures main topic
-- Professional but friendly tone
-- No quotes or special characters
-- Do not use markdown formatting
-
-Title:`,
+      output: Output.object({
+        schema: z.object({
+          title: z
+            .string()
+            .describe("The title of the conversation")
+            .refine((title) => title.split(" ").length <= 5, {
+              message: "Title must be less than or equal to 5 words",
+            }),
+        }),
+      }),
+      prompt: `Generate a concise title (max 5 words) for this conversation.
+      Rules:
+      - Maximum 5 words
+      - Captures main topic
+      - Professional but friendly tone
+      - No quotes or special characters
+      - No markdown formatting
+      Conversation:
+      ${content}`,
       maxRetries: 2,
     });
 
-    return text.trim();
+    const cleanedTitle = goLib.stripMarkdown(rawTitleResult);
+    return cleanedTitle.trim();
   } catch (error) {
     console.error("Title generation failed:", error);
     // Fallback to truncated content
@@ -37,9 +54,14 @@ Title:`,
  */
 export async function inferPageTitle(url: string): Promise<string> {
   try {
+    const goLib = getGoLibFFI();
+    if (!goLib) {
+      throw new Error("Go library not available for title generation");
+    }
+
     const { text } = await generateText({
       model: smallModel, // Use small model for quick inference
-      prompt: `Given this URL, infer the most likely page title. Be concise and professional. Do not use markdown formatting.
+      prompt: `Given this URL, infer the most likely page title. Be concise and professional.
 
 URL: ${url}
 
@@ -49,7 +71,9 @@ Title:`,
       maxRetries: 1,
     });
 
-    return text.trim().replace(/["']+/g, ""); // Clean quotes
+    const rawTitleNoQuotes = text.trim().replace(/["']+/g, "");
+    const cleanedTitle = goLib.stripMarkdown(rawTitleNoQuotes);
+    return cleanedTitle.trim();
   } catch (error) {
     console.error("Title inference failed for", url, ":", error);
     // Fallback: extract domain and path
@@ -114,6 +138,11 @@ export function extractSearchKeywords(query: string): string[] {
  */
 export async function generateShortFilenameDescription(content: string): Promise<string> {
   try {
+    const goLib = getGoLibFFI();
+    if (!goLib) {
+      throw new Error("Go library not available for filename description generation");
+    }
+
     const { text } = await generateText({
       model: smallModel,
       prompt: `Create a very short filename-friendly description (max 3-4 words) for this content:
@@ -133,7 +162,8 @@ Short description:`,
     });
 
     // Clean up the text to be filename-safe
-    const cleaned = text
+    const cleaned = goLib
+      .stripMarkdown(text.trim())
       .trim()
       .replace(/[^a-zA-Z0-9\s]/g, "") // Remove special characters
       .replace(/\s+/g, " ") // Collapse multiple spaces
