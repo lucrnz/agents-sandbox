@@ -17,6 +17,7 @@ Requirements:
 - Captures main topic
 - Professional but friendly tone
 - No quotes or special characters
+- Do not use markdown formatting
 
 Title:`,
       maxRetries: 2,
@@ -38,7 +39,7 @@ export async function inferPageTitle(url: string): Promise<string> {
   try {
     const { text } = await generateText({
       model: smallModel, // Use small model for quick inference
-      prompt: `Given this URL, infer the most likely page title. Be concise and professional.
+      prompt: `Given this URL, infer the most likely page title. Be concise and professional. Do not use markdown formatting.
 
 URL: ${url}
 
@@ -123,6 +124,7 @@ Requirements:
 - Max 3-4 words
 - Use only letters, numbers, and spaces
 - No special characters, quotes, or punctuation
+- Do not use markdown formatting
 - Be concise and descriptive
 - Use common words that capture the essence
 
