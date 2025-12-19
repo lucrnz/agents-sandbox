@@ -1,9 +1,10 @@
 import { xai } from "@ai-sdk/xai";
-import { openrouter } from "@openrouter/ai-sdk-provider";
+import { mistral } from "@ai-sdk/mistral";
 import type { LanguageModel } from "ai";
 
 /**
- * Small Model: Mistral Nemo via OpenRouter
+ * Small Model: Mistral 3B
+ * https://docs.mistral.ai/models/ministral-3-3b-25-12
  *
  * Use for:
  * - Conversation title generation
@@ -14,7 +15,7 @@ import type { LanguageModel } from "ai";
  *
  * Not recommended for complex reasoning or main chat responses.
  */
-export const smallModel: LanguageModel = openrouter("mistralai/mistral-nemo");
+export const smallModel: LanguageModel = mistral("ministral-3b-2512");
 
 /**
  * Big Model: xAI Grok 4-1 Fast Reasoning

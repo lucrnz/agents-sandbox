@@ -6,24 +6,25 @@ A sandbox for training AI agents to interact with UI elements.
 
 1. **Setup env** (for AI):
 
-   ```bash
-   cp .env.example .env
-   # Add XAI_API_KEY=your_key
-   ```
+```sh
+cp .env.example .env
+```
+
+Setup API keys respectively. For [xAI provider](https://console.x.ai/) and for [Mistral Provider](https://console.mistral.ai/)
 
 2. **Install**:
 
-   ```bash
-   bun install
-   ```
+```sh
+bun install
+```
 
 3. **Dev server**:
 
-   ```bash
-   bun dev
-   ```
+```sh
+bun dev
+```
 
-   Visit http://localhost:3000
+Visit http://localhost:3000
 
 ## Scripts
 
@@ -48,5 +49,3 @@ A sandbox for training AI agents to interact with UI elements.
 - Web search/fetch
 - Todo app sandbox
 - Conv history
-
-[AGENTS.md] Developer guide.
