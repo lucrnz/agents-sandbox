@@ -1,6 +1,8 @@
 import { Route, Switch } from "wouter";
 import { lazy } from "react";
 import { GlobalLayout } from "./global-layout";
+import { DevModeProvider } from "./contexts/dev-mode-context";
+import { DevModeOverlay } from "./components/dev-mode-overlay";
 
 const HomePage = lazy(() => import("./pages/home/home-page"));
 const ChatPage = lazy(() => import("./pages/chat/chat-page"));
@@ -8,8 +10,12 @@ const TodoAppPage = lazy(() => import("./sandbox/todo-app/TodoApp"));
 const NotFoundPage = lazy(() => import("./pages/not-found/not-found-page"));
 
 function Providers({ children }: { children: React.ReactNode }) {
-  // Reservered for future providers
-  return <>{children}</>;
+  return (
+    <DevModeProvider>
+      {children}
+      {process.env.NODE_ENV !== "production" && <DevModeOverlay />}
+    </DevModeProvider>
+  );
 }
 
 function Router() {

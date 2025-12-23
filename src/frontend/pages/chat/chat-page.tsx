@@ -5,6 +5,7 @@ import { Textarea } from "@/frontend/components/ui/textarea";
 import { useWebSocket } from "@/frontend/hooks/useWebSocket";
 import ConversationSidebar from "@/frontend/components/conversation-sidebar";
 import { MarkdownRenderer } from "@/frontend/components/markdown-renderer";
+import { useDevMode } from "@/frontend/contexts/dev-mode-context";
 import {
   SendMessage,
   LoadConversation,
@@ -72,6 +73,8 @@ export default function ChatPage() {
       window.location.host
     }/chat-ws`,
   });
+
+  const { allowSendingMessages } = useDevMode();
 
   const isConnected = connectionState === "connected";
 
@@ -663,7 +666,9 @@ export default function ChatPage() {
                     />
                     <Button
                       onClick={handleSendMessage}
-                      disabled={!isConnected || isLoading || !inputMessage.trim()}
+                      disabled={
+                        !allowSendingMessages && (!isConnected || isLoading || !inputMessage.trim())
+                      }
                       className="h-10 w-10 rounded-full p-2"
                       aria-label="Send"
                     >
