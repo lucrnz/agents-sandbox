@@ -44,7 +44,7 @@ Returns: Search results, page analysis, or error messages with clear next steps.
       console.log("[AGENTIC_FETCH] Input:", { prompt, url });
 
       // Store debug data if DEBUG is enabled
-      const debugEnabled = process.env.DEBUG === "true";
+      const debugEnabled = process.env.DEBUG === "true" || process.env.DEBUG === "1";
       let debugData: {
         mode: string;
         input: { prompt: string; url?: string };
