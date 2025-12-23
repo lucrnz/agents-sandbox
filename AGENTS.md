@@ -441,7 +441,6 @@ High-performance Go library that provides HTML processing, HTML-to-markdown conv
 **Performance improvements:**
 - 2-5x faster HTML processing
 - 50-70% less memory usage for large documents
-- Graceful fallback to TypeScript implementation when unavailable
 
 ### Location
 
