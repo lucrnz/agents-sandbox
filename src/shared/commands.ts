@@ -69,6 +69,16 @@ export const AIResponseEvent = registry.event(
   }),
 );
 
+export const AIResponseChunkEvent = registry.event(
+  "ai_response_chunk",
+  z.object({
+    messageId: z.number(),
+    conversationId: z.string(),
+    delta: z.string(),
+    timestamp: z.string().datetime(),
+  }),
+);
+
 export const ConversationUpdatedEvent = registry.event(
   "conversation_updated",
   z.object({
@@ -147,6 +157,7 @@ export type GetConversationsRequest = z.infer<typeof GetConversations.requestSch
 export type GetConversationsResponse = z.infer<typeof GetConversations.responseSchema>;
 
 export type AIResponsePayload = z.infer<typeof AIResponseEvent.payloadSchema>;
+export type AIResponseChunkPayload = z.infer<typeof AIResponseChunkEvent.payloadSchema>;
 export type ConversationUpdatedPayload = z.infer<typeof ConversationUpdatedEvent.payloadSchema>;
 export type SystemNotificationPayload = z.infer<typeof SystemNotificationEvent.payloadSchema>;
 

@@ -1,7 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/frontend/components/ui/button";
-import { Input } from "@/frontend/components/ui/input";
-import { Card } from "@/frontend/components/ui/card";
 import { ArrowUp } from "lucide-react";
 import { Textarea } from "@/frontend/components/ui/textarea";
 import { useWebSocket } from "@/frontend/hooks/useWebSocket";
@@ -12,6 +10,7 @@ import {
   LoadConversation,
   GetConversations,
   AIResponseEvent,
+  AIResponseChunkEvent,
   ConversationUpdatedEvent,
   SystemNotificationEvent,
   AgentToolStartEvent,
@@ -19,6 +18,7 @@ import {
   AgentToolErrorEvent,
   ChatAgentErrorEvent,
   type AIResponsePayload,
+  type AIResponseChunkPayload,
   type ConversationUpdatedPayload,
   type SystemNotificationPayload,
   type AgentToolStartPayload,
@@ -28,6 +28,7 @@ import {
 } from "@/shared/commands";
 
 interface Message {
+  id?: number;
   sender: "user" | "assistant" | "system";
   text: string;
   timestamp: string;
@@ -77,15 +78,63 @@ export default function ChatPage() {
 
   useEffect(() => {
     const unsubAIResponse = on<AIResponsePayload>(AIResponseEvent, (payload) => {
-      setMessages((prev) => [
-        ...prev,
-        {
+      setMessages((prev) => {
+        // Find if we already have this message (from chunks)
+        const existingIndex = prev.findIndex((m) => m.id === payload.messageId);
+        if (existingIndex !== -1) {
+          const newMessages = [...prev];
+          const existingMessage = newMessages[existingIndex];
+          if (existingMessage) {
+            newMessages[existingIndex] = {
+              ...existingMessage,
+              text: payload.content, // Ensure final content is exactly as sent
+              timestamp: payload.timestamp,
+            };
+            return newMessages;
+          }
+        }
+
+        // If not found (shouldn't really happen with chunks), add it
+        const newMessage: Message = {
+          id: payload.messageId,
           sender: "assistant",
           text: payload.content,
           timestamp: payload.timestamp,
-        },
-      ]);
+        };
+        return [...prev, newMessage];
+      });
       setIsLoading(false);
+    });
+
+    const unsubAIResponseChunk = on<AIResponseChunkPayload>(AIResponseChunkEvent, (payload) => {
+      setMessages((prev) => {
+        const existingIndex = prev.findIndex((m) => m.id === payload.messageId);
+        if (existingIndex !== -1) {
+          const newMessages = [...prev];
+          const existingMessage = newMessages[existingIndex];
+          if (existingMessage) {
+            newMessages[existingIndex] = {
+              ...existingMessage,
+              text:
+                existingMessage.text === "🤔 Thinking..."
+                  ? payload.delta
+                  : existingMessage.text + payload.delta,
+              timestamp: payload.timestamp,
+            };
+            return newMessages;
+          }
+        }
+
+        // First chunk for this message
+        const newMessage: Message = {
+          id: payload.messageId,
+          sender: "assistant",
+          text: payload.delta,
+          timestamp: payload.timestamp,
+        };
+        return [...prev, newMessage];
+      });
+      // We keep isLoading true while chunks are coming
     });
 
     const unsubConversationUpdated = on<ConversationUpdatedPayload>(
@@ -191,6 +240,7 @@ export default function ChatPage() {
 
     return () => {
       unsubAIResponse();
+      unsubAIResponseChunk();
       unsubConversationUpdated();
       unsubSystemNotification();
       unsubAgentToolStart();
@@ -276,6 +326,21 @@ export default function ChatPage() {
         conversationId: currentConversationId,
       });
 
+      // Update the user message with its actual ID from the database
+      setMessages((prev) => {
+        const lastMessageIndex = prev.length - 1;
+        const lastMessage = prev[lastMessageIndex];
+        if (lastMessage && lastMessage.sender === "user") {
+          const newMessages = [...prev];
+          newMessages[lastMessageIndex] = {
+            ...lastMessage,
+            id: result.messageId,
+          };
+          return newMessages;
+        }
+        return prev;
+      });
+
       // Update conversation ID if this was first message
       if (!currentConversationId) {
         setCurrentConversationId(result.conversationId);
@@ -319,6 +384,7 @@ export default function ChatPage() {
       setCurrentConversationTitle(result.title);
       setMessages(
         result.messages.map((msg) => ({
+          id: msg.id,
           sender: msg.role,
           text: msg.content,
           timestamp: msg.createdAt,
@@ -348,6 +414,21 @@ export default function ChatPage() {
       const result = await send(SendMessage, {
         content: lastFailedMessage,
         conversationId: currentConversationId,
+      });
+
+      // Update the user message with its actual ID from the database
+      setMessages((prev) => {
+        const lastMessageIndex = prev.length - 1;
+        const lastMessage = prev[lastMessageIndex];
+        if (lastMessage && lastMessage.sender === "user") {
+          const newMessages = [...prev];
+          newMessages[lastMessageIndex] = {
+            ...lastMessage,
+            id: result.messageId,
+          };
+          return newMessages;
+        }
+        return prev;
       });
 
       // Update conversation ID if this was first message
@@ -409,7 +490,7 @@ export default function ChatPage() {
       )}
 
       <div className="flex min-h-0 flex-1 flex-col">
-        <header className="bg-card flex flex-shrink-0 items-center justify-between border-b px-4 py-5 shadow-sm">
+        <header className="bg-card flex shrink-0 items-center justify-between border-b px-4 py-5 shadow-sm">
           <h1 className="text-foreground text-xl font-bold">
             {currentConversationTitle} - AI Chat
           </h1>
@@ -423,7 +504,7 @@ export default function ChatPage() {
         </header>
 
         {connectionState === "failed" && (
-          <div className="bg-destructive/10 border-destructive/20 mx-4 mt-4 flex flex-shrink-0 items-center justify-between rounded-lg border p-4">
+          <div className="bg-destructive/10 border-destructive/20 mx-4 mt-4 flex shrink-0 items-center justify-between rounded-lg border p-4">
             <p className="text-destructive">Connection failed</p>
             <Button onClick={reconnect} variant="outline" size="sm">
               Retry Connection
