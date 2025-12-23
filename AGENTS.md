@@ -15,11 +15,6 @@ The root directory must contain **ONLY TWO** markdown files:
 
 **CLAUDE.md** is exclusively for the Claude Code CLI tool. It must always be a **symbolic link** to AGENTS.md, not a separate file:
 
-```bash
-# Create the symbolic link (if not already present)
-ln -s AGENTS.md CLAUDE.md
-```
-
 **Never** edit CLAUDE.md directly - it should always point to AGENTS.md so both human and AI agents see consistent documentation.
 
 ### Documentation for Non-Humans
@@ -133,7 +128,6 @@ src/
 └── shared/                    # Shared between frontend/backend
     ├── command-system.ts      # WebSocket message schemas & types
     ├── commands.ts            # Command/event definitions
-    └── websocket-schemas.ts   # (Legacy) WebSocket schemas
 ```
 
 ## WebSocket Command System
@@ -379,12 +373,64 @@ import { Button } from "@/frontend/components/ui/button";
 import { cn } from "@/frontend/lib/utils";
 ```
 
-## Testing
+## Unit Testing
+### Test Stack
 
-No test suite currently configured. When adding tests:
+- **Bun Test Runner** - Bun's built-in Jest-compatible test runner
+- **happy-dom** - Lightweight DOM implementation for headless browser testing
+- **React Testing Library** - DOM testing utilities for React components
 
-- Use `bun test` (Bun's built-in test runner)
-- Import from `bun:test` (not jest/vitest)
+### Running Tests
+
+```bash
+# Run all tests
+bun test
+
+# Run tests in watch mode
+bun test --watch
+
+# Run specific test file
+bun test ./path/to/test.test.tsx
+
+# Run tests matching a pattern
+bun test --test-name-pattern "button"
+```
+
+### Writing Component Tests
+
+When testing React components, import from `bun:test` and use React Testing Library:
+
+```typescript
+/// <reference lib="dom" />
+
+import { test, expect, describe } from "bun:test";
+import { render, screen } from "@testing-library/react";
+
+// Example component test
+describe("Button component", () => {
+  test("renders with correct text", () => {
+    render(<Button>Click me</Button>);
+    expect(screen.getByRole("button")).toHaveTextContent("Click me");
+  });
+
+  test("calls onClick handler when clicked", async () => {
+    const handleClick = mock(() => {});
+    render(<Button onClick={handleClick}>Click me</Button>);
+
+    await screen.getByRole("button").click();
+    expect(handleClick).toHaveBeenCalled();
+  });
+});
+```
+
+### Test Documentation
+
+For detailed API reference and examples, see the [Bun test documentation](./node_modules/bun-types/docs/test/index.mdx)
+
+### Unit Tests Final Remarks
+
+- DO NOT install jsdom
+- DO NOT install jest
 
 ## Go Library FFI (`go-lib-ffi/`)
 
@@ -411,21 +457,6 @@ The Go library provides these functions (callable from TypeScript):
 - **`ConvertHTMLToMarkdown(html: string): string`** - Convert HTML to markdown
 - **`ParseSearchResults(html: string, maxResults: number): SearchResult[]`** - Parse DuckDuckGo results
 - **`GetLibraryVersion(): string`** - Get library version
-
-### Integration Flow
-
-The Go library is integrated into `src/backend/agent/web-tools.ts` with automatic fallback:
-
-```typescript
-const goLib = getGoLibFFI();
-if (goLib) {
-  // Use Go library (faster)
-  const cleaned = goLib.cleanHTML(html);
-} else {
-  // Fallback to happy-dom/Turndown
-  const cleaned = removeNoisyElementsWithHappyDom(html);
-}
-```
 
 ### Building
 
@@ -477,24 +508,18 @@ make clean        # Remove build artifacts
 
 10. **CSS imports** - Import CSS directly in TSX files, Bun handles bundling
 
-11. **Virtual workspace** - `/home/agent` is a made-up virtual directory for sub-agents. It maps to an actual OS temp directory (e.g., `/tmp/agents-sandbox-{timestamp}`) and does NOT exist on the host OS. This is an implementation detail for sandboxing, not a real path.
-
 ## Debugging Tips
-
 ### Backend
-
 - Console logs prefixed with `[COMMAND_HANDLER]`, `[CHAT_AGENT]`, etc.
 - WebSocket messages logged for debugging
 - AI tool execution status updates streamed
 
 ### Frontend
-
 - React DevTools supported
 - WebSocket connection state in `useWebSocket` hook
 - Component hot reloading preserves state when possible
 
 ### Database
-
 - SQLite DB file location in `.env` (`DB_FILE_NAME`)
 - Use Drizzle Studio for GUI inspection: `bunx drizzle-kit studio`
 - All queries in `src/backend/db/queries.ts`
