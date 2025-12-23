@@ -50,9 +50,14 @@ export class ChatOrchestrator {
    */
   private async generateTitleIfNeeded(content: string) {
     const conversationWithMessages = await getConversationWithMessages(this.conversationId);
+    if (!conversationWithMessages) return;
 
-    // If it's the first message (the user message we just added)
-    if (conversationWithMessages && conversationWithMessages.messages.length === 1) {
+    const messageCount = conversationWithMessages.messages.length;
+    // Check if it's a default title - this is more reliable than just message count
+    const isDefaultTitle = conversationWithMessages.title.startsWith("New chat");
+
+    // If it's a default title and we have 1 or 2 messages (user + optional thinking message)
+    if (isDefaultTitle && messageCount >= 1 && messageCount <= 2) {
       let title: string;
       try {
         title = await generateConversationTitle(content);

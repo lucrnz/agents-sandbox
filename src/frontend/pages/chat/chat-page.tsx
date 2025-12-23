@@ -54,6 +54,9 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState<"Thinking..." | "Generating...">(
+    "Thinking...",
+  );
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<string>();
   const [currentConversationTitle, setCurrentConversationTitle] = useState("New Chat");
@@ -107,6 +110,9 @@ export default function ChatPage() {
     });
 
     const unsubAIResponseChunk = on<AIResponseChunkPayload>(AIResponseChunkEvent, (payload) => {
+      // Switch status to generating as soon as we get chunks
+      setLoadingStatus("Generating...");
+
       setMessages((prev) => {
         const existingIndex = prev.findIndex((m) => m.id === payload.messageId);
         if (existingIndex !== -1) {
@@ -317,6 +323,7 @@ export default function ChatPage() {
 
     setMessages((prev) => [...prev, userMessage]);
     setInputMessage("");
+    setLoadingStatus("Thinking...");
     setIsLoading(true);
     setHasAgentError(false);
 
@@ -344,6 +351,8 @@ export default function ChatPage() {
       // Update conversation ID if this was first message
       if (!currentConversationId) {
         setCurrentConversationId(result.conversationId);
+        // Refresh sidebar to show the new (placeholder) thread immediately
+        loadConversationsList();
       }
     } catch (error) {
       console.error("Failed to send message:", error);
@@ -407,6 +416,7 @@ export default function ChatPage() {
 
     setMessages((prev) => [...prev, userMessage]);
     setLastFailedMessage("");
+    setLoadingStatus("Thinking...");
     setIsLoading(true);
     setHasAgentError(false);
 
@@ -632,7 +642,7 @@ export default function ChatPage() {
                   {isLoading && (
                     <div className="flex justify-center">
                       <div className="text-foreground max-w-2xl p-4 xl:max-w-3xl">
-                        <p>Thinking...</p>
+                        <p>{loadingStatus}</p>
                       </div>
                     </div>
                   )}
