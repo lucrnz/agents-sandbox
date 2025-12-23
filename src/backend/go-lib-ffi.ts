@@ -114,23 +114,44 @@ export class GoLibFFIWrapper {
     return this.isLoaded && this.lib !== null;
   }
 
-  public cleanHTML(html: string): string {
+  /**
+   * Safely frees a C string pointer returned by the Go library
+   */
+  private freePtr(ptr: any): void {
+    if (ptr && this.lib) {
+      try {
+        (this.lib.symbols.FreeString as any)(ptr);
+      } catch (e) {
+        // Ignore errors from FreeString
+      }
+    }
+  }
+
+  /**
+   * Executes an FFI function, converts the result pointer to a string,
+   * frees the pointer, and returns the string.
+   */
+  private withStringResult(fn: () => any, defaultValue: string = ""): string {
     if (!this.isAvailable()) {
       throw new Error("Go library not available");
     }
 
     try {
-      // Encode string as buffer for FFI
-      const buffer = Buffer.from(html + "\0"); // Add null terminator
-      const resultPtr = (this.lib!.symbols.CleanHTML as any)(buffer);
-      const result = resultPtr ? resultPtr.toString() : "";
-      // Free the pointer (ignore errors if already freed)
-      try {
-        (this.lib!.symbols.FreeString as any)(resultPtr);
-      } catch (e) {
-        // Ignore errors from FreeString
-      }
+      const ptr = fn();
+      if (!ptr) return defaultValue;
+      const result = ptr.toString();
+      this.freePtr(ptr);
       return result;
+    } catch (error) {
+      // We don't log here to allow methods to provide better context
+      throw error;
+    }
+  }
+
+  public cleanHTML(html: string): string {
+    try {
+      const buffer = Buffer.from(html + "\0");
+      return this.withStringResult(() => (this.lib!.symbols.CleanHTML as any)(buffer));
     } catch (error) {
       console.error("[GO_LIB_FFI] Error in cleanHTML:", error);
       throw error;
@@ -138,21 +159,9 @@ export class GoLibFFIWrapper {
   }
 
   public convertToMarkdown(html: string): string {
-    if (!this.isAvailable()) {
-      throw new Error("Go library not available");
-    }
-
     try {
       const buffer = Buffer.from(html + "\0");
-      const resultPtr = (this.lib!.symbols.ConvertHTMLToMarkdown as any)(buffer);
-      const result = resultPtr ? resultPtr.toString() : "";
-      // Free the pointer (ignore errors if already freed)
-      try {
-        (this.lib!.symbols.FreeString as any)(resultPtr);
-      } catch (e) {
-        // Ignore errors from FreeString
-      }
-      return result;
+      return this.withStringResult(() => (this.lib!.symbols.ConvertHTMLToMarkdown as any)(buffer));
     } catch (error) {
       console.error("[GO_LIB_FFI] Error in convertToMarkdown:", error);
       throw error;
@@ -160,24 +169,15 @@ export class GoLibFFIWrapper {
   }
 
   public parseSearchResults(html: string, maxResults: number = 20): SearchResult[] {
-    if (!this.isAvailable()) {
-      throw new Error("Go library not available");
-    }
-
     try {
       const buffer = Buffer.from(html + "\0");
-      const resultPtr = (this.lib!.symbols.ParseSearchResults as any)(buffer, maxResults);
-      const result = resultPtr ? resultPtr.toString() : "[]";
-      // Free the pointer (ignore errors if already freed)
-      try {
-        (this.lib!.symbols.FreeString as any)(resultPtr);
-      } catch (e) {
-        // Ignore errors from FreeString
-      }
+      const result = this.withStringResult(
+        () => (this.lib!.symbols.ParseSearchResults as any)(buffer, maxResults),
+        "[]",
+      );
 
-      // Handle null or undefined result
-      if (!result || result.trim() === "") {
-        console.warn("[GO_LIB_FFI] ParseSearchResults returned empty string");
+      // Handle empty result
+      if (!result || result.trim() === "" || result === "[]") {
         return [];
       }
 
@@ -196,7 +196,7 @@ export class GoLibFFIWrapper {
         return [];
       }
 
-      // Transform from Go format (Title, Link, Snippet, Position) to TS format (title, link, snippet, position)
+      // Transform from Go format to TS format
       return goResults.map((r) => ({
         title: r.Title || "",
         link: r.Link || "",
@@ -210,21 +210,9 @@ export class GoLibFFIWrapper {
   }
 
   public stripMarkdown(markdown: string): string {
-    if (!this.isAvailable()) {
-      throw new Error("Go library not available");
-    }
-
     try {
       const buffer = Buffer.from(markdown + "\0");
-      const resultPtr = (this.lib!.symbols.StripMarkdown as any)(buffer);
-      const result = resultPtr ? resultPtr.toString() : "";
-      // Free the pointer (ignore errors if already freed)
-      try {
-        (this.lib!.symbols.FreeString as any)(resultPtr);
-      } catch (e) {
-        // Ignore errors from FreeString
-      }
-      return result;
+      return this.withStringResult(() => (this.lib!.symbols.StripMarkdown as any)(buffer));
     } catch (error) {
       console.error("[GO_LIB_FFI] Error in stripMarkdown:", error);
       throw error;
@@ -237,16 +225,7 @@ export class GoLibFFIWrapper {
     }
 
     try {
-      const resultPtr = (this.lib!.symbols.GetLibraryVersion as any)();
-      // GetLibraryVersion returns a pointer that needs to be freed
-      const result = resultPtr ? resultPtr.toString() : "unknown";
-      // Free the pointer (ignore errors if already freed)
-      try {
-        (this.lib!.symbols.FreeString as any)(resultPtr);
-      } catch (e) {
-        // Ignore errors from FreeString
-      }
-      return result;
+      return this.withStringResult(() => (this.lib!.symbols.GetLibraryVersion as any)(), "unknown");
     } catch (error) {
       console.error("[GO_LIB_FFI] Error getting version:", error);
       return "unknown";
