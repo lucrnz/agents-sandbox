@@ -3,7 +3,7 @@ import { mistral } from "@ai-sdk/mistral";
 import type { LanguageModel } from "ai";
 
 /**
- * Small Model: Mistral 3B
+ * Small Model: Ministral 3B
  * https://docs.mistral.ai/models/ministral-3-3b-25-12
  *
  * Use for:
@@ -18,7 +18,7 @@ import type { LanguageModel } from "ai";
 export const smallModel: LanguageModel = mistral("ministral-3b-2512");
 
 /**
- * Big Model: xAI Grok 4-1 Fast Reasoning
+ * Big Model: xAI Grok 4.1 Fast Reasoning
  *
  * Use for:
  * - Main chat agent conversations
@@ -28,6 +28,3 @@ export const smallModel: LanguageModel = mistral("ministral-3b-2512");
  * - Any task requiring sophisticated understanding
  */
 export const bigModel: LanguageModel = xai("grok-4-1-fast-reasoning");
-
-// Type for importing models
-export type { LanguageModel };

@@ -1,13 +1,12 @@
-import { Experimental_Agent as Agent, stepCountIs } from "ai";
+import { ToolLoopAgent, stepCountIs } from "ai";
 import { bigModel } from "./model-config.js";
 import { createAgenticFetchTool } from "./agentic-fetch.js";
-import { generateConversationTitle } from "./title-generation.js";
 
 /**
  * Simple ChatAgent configuration with agentic fetch tool
  */
 export class ChatAgent {
-  private agent: Agent<{ agentic_fetch: ReturnType<typeof createAgenticFetchTool> }>;
+  private agent: ToolLoopAgent<never, any, any>;
   private params?: {
     onToolCall?: (toolName: string, args: any) => void;
     onToolResult?: (toolName: string, result: any, error?: Error) => void;
@@ -21,14 +20,16 @@ export class ChatAgent {
   }) {
     // Store params for use in error handling
     this.params = params;
-    // Initialize the agent with xAI model (currently using Grok)
+
     const agenticFetchTool = createAgenticFetchTool();
     console.log("[CHAT_AGENT] Initializing with tools:", { agentic_fetch: !!agenticFetchTool });
 
-    this.agent = new Agent({
+    this.agent = new ToolLoopAgent({
       model: bigModel,
-      system: `You are a helpful AI assistant. Be conversational, thoughtful, and provide detailed responses when appropriate.
-      
+      instructions: `You are a helpful AI assistant. Be conversational, thoughtful, and provide detailed responses when appropriate.
+
+Current Date: ${new Date().toDateString()}
+
 - Always be friendly and professional
 - Ask clarifying questions when needed
 - Provide helpful, accurate information
@@ -45,36 +46,26 @@ export class ChatAgent {
       stopWhen: stepCountIs(10),
 
       // Track tool execution for real-time status updates
-      prepareStep: async ({ steps }) => {
-        if (!steps || steps.length === 0) return {};
-
-        const lastStep = steps[steps.length - 1];
-
+      onStepFinish: async (stepResult) => {
         // Check for tool calls (tool execution starting)
-        if (lastStep?.toolCalls && lastStep.toolCalls.length > 0) {
-          for (const toolCall of lastStep.toolCalls) {
-            // Type assertion to access args property
-            const call = toolCall as any;
-            console.log(`[CHAT_AGENT] Tool call detected: ${toolCall.toolName}`, call.args);
+        if (stepResult.staticToolCalls && stepResult.staticToolCalls.length > 0) {
+          for (const toolCall of stepResult.staticToolCalls) {
+            console.log(`[CHAT_AGENT] Tool call detected: ${toolCall.toolName}`, toolCall.input);
             if (params?.onToolCall) {
-              params.onToolCall(toolCall.toolName, call.args);
+              params.onToolCall(toolCall.toolName, toolCall.input);
             }
           }
         }
 
         // Check for tool results (tool execution completed)
-        if (lastStep?.toolResults && lastStep.toolResults.length > 0) {
-          for (const toolResult of lastStep.toolResults) {
-            // Type assertion to access result/error properties
-            const result = toolResult as any;
-            console.log(`[CHAT_AGENT] Tool result: ${toolResult.toolName}`, result.result);
+        if (stepResult.staticToolResults && stepResult.staticToolResults.length > 0) {
+          for (const toolResult of stepResult.staticToolResults) {
+            console.log(`[CHAT_AGENT] Tool result: ${toolResult.toolName}`);
             if (params?.onToolResult) {
-              params.onToolResult(toolResult.toolName, result.result, result.error);
+              params.onToolResult(toolResult.toolName, toolResult.output, undefined);
             }
           }
         }
-
-        return {}; // Continue with default settings
       },
     });
   }
@@ -140,17 +131,4 @@ export class ChatAgent {
       return "❌ Sorry, I encountered an error while generating a response. Please try again.";
     }
   }
-
-  /**
-   * Get the chat agent instance (for direct access)
-   */
-  getAgent() {
-    return this.agent;
-  }
 }
-
-// Export a singleton instance
-export const chatAgent = new ChatAgent();
-
-// Export title generation function for command handlers
-export { generateConversationTitle };

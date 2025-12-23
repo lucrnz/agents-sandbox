@@ -69,7 +69,7 @@ bun run build.ts --outdir=dist --minify --sourcemap=linked --external=react,reac
 - **Bun runtime** - Full Stack JavaScript runtime (alternative to Node.js)
 - **Bun.serve()** - Built-in HTTP/WebSocket server (no Express)
 - **Drizzle ORM** - SQLite database with `bun:sqlite`
-- **AI SDK** - xAI (Grok) + OpenRouter integration
+- **AI SDK** - xAI (Grok) + Mistral (3B) integration
 - **Agent Tools** - Built-in agentic fetch with web search capabilities
 
 ### Frontend Framework
@@ -97,10 +97,15 @@ src/
 │   ├── command-handlers.ts    # WebSocket command handlers
 │   ├── agent/                 # AI agent implementations
 │   │   ├── chat-agent.ts      # Main chat agent with xAI/Grok
-│   │   ├── agentic-fetch.ts   # Web search/browsing tool
+│   │   ├── agentic-fetch.ts   # Web research sub-agent (spawns sub-agent with tools)
+│   │   ├── sub-agent.ts       # Sub-agent base class with virtual workspace
+│   │   ├── web-search.ts      # Web search tool (DuckDuckGo)
+│   │   ├── web-fetch.ts       # Web fetch tool (URL → markdown)
+│   │   ├── view-tool.ts       # View file contents tool (with security boundaries)
+│   │   ├── grep-tool.ts       # Search within files tool (with security boundaries)
 │   │   ├── title-generation.ts # Conversation title generation
 │   │   ├── model-config.ts    # AI model configurations
-│   │   └── web-tools.ts       # Web scraping utilities
+│   │   └── web-tools.ts       # Web scraping utilities (shared)
 │   └── db/                    # Database layer
 │       ├── index.ts           # Database connection
 │       ├── schema.ts          # Drizzle schema definitions
@@ -226,12 +231,72 @@ bunx drizzle-kit studio
 - **Tools**: `agentic_fetch` for web browsing/search
 - **Streaming**: Real-time response streaming with status updates
 
-### Agentic Fetch Tool
+### Agentic Fetch (Sub-Agent Pattern)
 
-- **Search**: DuckDuckGo web search
-- **Browse**: Web page content extraction
-- **Status**: Real-time status updates during tool execution
-- **Integration**: Automatic tool invocation based on user queries
+**Architecture:**
+
+The agentic_fetch tool is implemented as a **sub-agent** - an autonomous AI agent that operates in a virtual sandbox to perform web research tasks.
+
+- **Model**: xAI Grok-4-1-fast-reasoning
+- **Pattern**: Recursive sub-agent (ChatAgent spawns Sub-Agent)
+
+```
+User → ChatAgent (Parent)
+         ↓ (invokes agentic_fetch)
+       Sub-Agent (with web_search, web_fetch, view, grep)
+         ↓ (autonomous execution in virtual workspace /home/agent)
+       Web Tools (DuckDuckGo, HTTP fetch, file operations)
+```
+
+**Virtual Workspace:**
+
+- **Virtual Path**: `/home/agent` - made-up directory for the sub-agent (does NOT exist on host OS)
+- **Actual Path**: Maps to OS temp directory (e.g., `/tmp/agents-sandbox-{timestamp}`)
+- **Security**: All filesystem tools (view, grep, web-fetch) are strictly bounded to `/home/agent`
+- **Cleanup**: Temp directory is automatically deleted when sub-agent completes
+
+**Critical Security Note:**
+
+`/home/agent` is a **virtual sandbox directory** - it does not exist on the host operating system. The sub-agent believes it's working in `/home/agent`, but all file operations are mapped to an actual OS temp directory. This is an implementation detail for sandboxing, not a real path on the filesystem.
+
+**Sub-Agent Tools:**
+
+1. **`web_search`** - DuckDuckGo web search to find information
+2. **`web_fetch`** - Fetch web pages and convert to markdown
+   - Saves large pages (>50KB) to virtual `/home/agent/` path
+   - Returns virtual path for use with view/grep tools
+3. **`view`** - Read file contents from virtual workspace
+   - **Security**: Validates all paths, rejects access outside `/home/agent`
+   - Only allows paths starting with `/home/agent` or relative paths
+4. **`grep`** - Search within files for specific patterns
+   - **Security**: Same path validation as view tool
+   - Efficiently search large saved files
+
+**Sub-Agent Capabilities:**
+
+- Performs multiple searches in sequence
+- Follows relevant links from search results
+- Analyzes fetched content to answer questions
+- Uses view/grep tools for efficient large-page analysis
+- Returns structured responses with sources
+
+**Tool Usage from ChatAgent:**
+
+```typescript
+// ChatAgent uses agentic_fetch as a simple tool
+const { agentic_fetch } = tools;
+await agentic_fetch({ prompt: "What are the main features of Python 3.12?" });
+```
+
+**Security Enforcement:**
+
+All filesystem tools (view, grep, web-fetch) implement strict path validation:
+
+- Only paths starting with `/home/agent` or relative paths are allowed
+- Paths outside sandbox are rejected with "forbidden request" error
+- Path traversal attempts (`../`, absolute paths) are blocked
+- Virtual paths are mapped to actual OS temp directories
+- No tool can bypass this validation (security-first design)
 
 ## Frontend Patterns
 
@@ -283,7 +348,7 @@ Create `.env` file (copy from `.env.example`):
 ```bash
 # AI API Keys
 XAI_API_KEY=your_xai_api_key_here
-OPENROUTER_API_KEY=your_openrouter_api_key_here
+MISTRAL_API_KEY=your_mistral_api_key_here
 
 # Database
 DB_FILE_NAME=sqlite.db
@@ -411,6 +476,8 @@ make clean        # Remove build artifacts
 9. **Component variants** - Use cva for component variants, never duplicate class strings
 
 10. **CSS imports** - Import CSS directly in TSX files, Bun handles bundling
+
+11. **Virtual workspace** - `/home/agent` is a made-up virtual directory for sub-agents. It maps to an actual OS temp directory (e.g., `/tmp/agents-sandbox-{timestamp}`) and does NOT exist on the host OS. This is an implementation detail for sandboxing, not a real path.
 
 ## Debugging Tips
 

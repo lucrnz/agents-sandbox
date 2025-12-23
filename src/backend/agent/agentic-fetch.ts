@@ -1,18 +1,15 @@
 import { z } from "zod";
 import { tool } from "ai";
-import { fetchUrlAndConvert, searchDuckDuckGo, formatSearchResults } from "./web-tools.js";
-import {
-  extractSearchKeywords,
-  inferPageTitle,
-  generateShortFilenameDescription,
-} from "./title-generation.js";
-import { writeFile } from "fs/promises";
-import { mkdir, access } from "fs/promises";
-import { join } from "path";
+import { SubAgent } from "./sub-agent";
+import { bigModel } from "./model-config";
+import { createWebSearchTool } from "./web-search";
+import { createWebFetchTool } from "./web-fetch";
+import { createViewTool } from "./view-tool";
+import { createGrepTool } from "./grep-tool";
+import { virtualPathToActual } from "./sub-agent";
 
 export const AgenticFetchParamsSchema = z.object({
   url: z
-    .string()
     .url()
     .optional()
     .describe(
@@ -23,112 +20,162 @@ export const AgenticFetchParamsSchema = z.object({
 
 export type AgenticFetchParams = z.infer<typeof AgenticFetchParamsSchema>;
 
+/**
+ * Sub-agent system prompt for web research and content analysis
+ */
+const SUB_AGENT_SYSTEM = `You are a web research assistant with tools to search, fetch, and analyze web content.
+
+## Your Capabilities
+
+1. **Web Search**: Use web_search to find information on any topic
+2. **Web Fetch**: Use web_fetch to get content from specific URLs
+3. **File View**: Use view to read saved files (especially for large pages)
+4. **Content Search**: Use grep to search within saved files for specific information
+
+## When to Use Each Tool
+
+- **web_search**: When you need to find current information, discover sources, or search for topics
+- **web_fetch**: When you have a specific URL and need to analyze its content
+- **view**: When web_fetch saved a large page to a file and you need to read it
+- **grep**: When you need to find specific information within a large saved file
+
+## Your Working Directory
+
+Your working directory is: /home/agent
+
+IMPORTANT: You can only read and write files within /home/agent.
+All file operations are strictly bounded to this virtual workspace.
+Any attempt to access paths outside /home/agent will be rejected with a "forbidden request" error.
+
+## Research Strategy
+
+1. **Understand the Request**: Carefully read what information is needed
+2. **Search or Fetch**: Use web_search for open queries, web_fetch for specific URLs
+3. **Analyze Content**: Read and analyze the fetched content
+4. **Follow Up**: If initial results aren't sufficient, perform additional searches or fetch more pages
+5. **Synthesize**: Combine information from multiple sources to provide a comprehensive answer
+
+## Response Format
+
+When answering, structure your response as:
+
+**Answer**: [Provide a clear, direct answer to the user's question]
+
+**Key Points**: [List the main findings]
+
+**Sources**: [List all URLs you referenced]
+- Source 1: [URL] - [Brief description]
+- Source 2: [URL] - [Brief description]
+
+**Notes**: [Any additional context, caveats, or relevant information]
+
+## Tips for Better Results
+
+- For broad topics, start with a general search, then narrow down with more specific searches
+- When analyzing a specific URL, use web_fetch first
+- For large pages, use grep to find relevant sections efficiently
+- Always cite your sources with URLs
+- If you can't find definitive information, be honest and explain what you found
+- For comparisons or multi-part questions, fetch multiple sources to get complete information
+
+Be thorough but concise. Focus on providing actionable information that directly answers the user's question.`;
+
 export function createAgenticFetchTool() {
   return tool({
-    description: `Searches for web information or fetches and analyzes content from URLs.
+    description: `Autonomous web research assistant that searches, fetches, and analyzes web content.
 
 Use this tool when you need:
 - Current information from the web (omit url parameter)
 - Specific information from a webpage (provide url)
 - Research topics by searching and analyzing results
-- Answer questions about online content
+- Compare information from multiple sources
+- Extract key information from web content
 
 Input:
 - prompt: What information to find or extract (required)
 - url: Specific URL to analyze (optional)
 
-Returns: Search results, page analysis, or error messages with clear next steps.`,
+Returns: Comprehensive analysis with structured answer, key points, and sources.
+
+The sub-agent autonomously:
+- Performs multiple searches as needed
+- Fetches relevant pages from search results
+- Analyzes large pages efficiently (saves to file, uses grep)
+- Synthesizes information from multiple sources
+- Provides structured response with sources`,
     inputSchema: AgenticFetchParamsSchema,
     execute: async ({ prompt, url }: AgenticFetchParams) => {
-      console.log("[AGENTIC_FETCH] *** TOOL EXECUTION START ***");
+      console.log("[AGENTIC_FETCH] *** SUB-AGENT START ***");
       console.log("[AGENTIC_FETCH] Input:", { prompt, url });
 
-      // Store debug data if DEBUG is enabled
-      const debugEnabled = process.env.DEBUG === "true" || process.env.DEBUG === "1";
-      let debugData: {
-        mode: string;
-        input: { prompt: string; url?: string };
-        timestamp: string;
-        result?: any;
-        error?: string;
-        details?: any;
-      } = {
-        mode: url ? "URL Analysis" : "Web Search",
-        input: { prompt, url },
-        timestamp: new Date().toISOString(),
-      };
+      // Determine execution mode for logging
+      const mode = url ? "URL Analysis" : "Web Search";
+      console.log("[AGENTIC_FETCH] MODE:", mode);
+
+      // Create tools that can access the workspace
+      let currentWorkspace: any = null;
+
+      const getWorkspace = () => currentWorkspace;
+
+      // Create tools
+      const webSearchTool = createWebSearchTool();
+      const webFetchTool = createWebFetchTool(getWorkspace);
+      const viewTool = createViewTool(getWorkspace, { virtualPathToActual });
+      const grepTool = createGrepTool(getWorkspace, { virtualPathToActual });
+
+      // Create sub-agent
+      const subAgent = new SubAgent({
+        model: bigModel,
+        system: SUB_AGENT_SYSTEM,
+        tools: {
+          web_search: webSearchTool,
+          web_fetch: webFetchTool,
+          view: viewTool,
+          grep: grepTool,
+        },
+        maxSteps: 10,
+        onToolCall: (toolName: string, args: any) => {
+          console.log(`[AGENTIC_FETCH] Sub-agent tool call: ${toolName}`, args);
+        },
+        onToolResult: (toolName: string, result: any, error?: Error) => {
+          if (error) {
+            console.error(`[AGENTIC_FETCH] Sub-agent tool error: ${toolName}`, error);
+          } else {
+            console.log(`[AGENTIC_FETCH] Sub-agent tool result: ${toolName}`);
+          }
+        },
+      });
+
+      // Build sub-agent prompt based on mode
+      let subAgentPrompt: string;
+      if (url) {
+        subAgentPrompt = `Analyze the webpage at: ${url}
+
+Request: ${prompt}
+
+Use web_fetch to get the content, then analyze it to answer the request. If the page is large and saved to a file, use view and grep tools to efficiently find relevant information.`;
+      } else {
+        subAgentPrompt = `Research: ${prompt}
+
+Use web_search to find relevant information, then use web_fetch to get content from the most relevant sources. Synthesize the information to provide a comprehensive answer with sources.`;
+      }
 
       try {
-        if (url) {
-          console.log("[AGENTIC_FETCH] MODE: URL Analysis");
-          console.log("[AGENTIC_FETCH] Fetching:", url);
+        // Execute sub-agent
+        console.log("[AGENTIC_FETCH] Executing sub-agent");
+        const result = await subAgent.execute(subAgentPrompt);
 
-          const content = await fetchUrlAndConvert(url);
-          const pageTitle = await inferPageTitle(url);
-          console.log("[AGENTIC_FETCH] Content length:", content.length);
+        console.log("[AGENTIC_FETCH] Sub-agent completed");
+        console.log("[AGENTIC_FETCH] Result length:", result.length);
 
-          if (debugEnabled) {
-            debugData.details = {
-              pageTitle,
-              contentLength: content.length,
-              content: content.substring(0, 10000), // Limit content size in debug
-            };
-            debugData.result = `Successfully analyzed ${pageTitle}. Content length: ${content.length} characters.`;
-          }
-
-          // Return actual tool result for LLM
-          return `Successfully analyzed ${pageTitle}. Content length: ${content.length} characters. Ready to provide insights.`;
-        } else {
-          console.log("[AGENTIC_FETCH] MODE: Web Search");
-          console.log("[AGENTIC_FETCH] Searching for:", prompt);
-
-          const keywords = extractSearchKeywords(prompt);
-          const keywordStr = keywords.length > 0 ? keywords.join(", ") : prompt.substring(0, 30);
-          const searchResults = await searchDuckDuckGo(prompt, 10);
-          const formattedResults = formatSearchResults(searchResults);
-          console.log("[AGENTIC_FETCH] Raw search results count:", searchResults.length);
-
-          if (debugEnabled) {
-            debugData.details = {
-              keywords: keywordStr,
-              searchResults,
-              formattedResults,
-            };
-            debugData.result = `Found ${searchResults.length} search results for "${keywordStr}".`;
-          }
-
-          if (searchResults.length === 0) {
-            console.log("[AGENTIC_FETCH] *** NO RESULTS FOUND ***");
-            if (debugEnabled) {
-              debugData.error = "No results found";
-            }
-            return `No results found for "${keywordStr}". The search may be too specific or DuckDuckGo is rate limiting.`;
-          }
-
-          // Return actual tool result for LLM
-          return formattedResults;
-        }
+        return result;
       } catch (error) {
-        console.error("[AGENTIC_FETCH] *** ERROR IN EXECUTION ***");
-        console.error("[AGENTIC_FETCH] Error:", error);
+        console.error("[AGENTIC_FETCH] Sub-agent failed:", error);
 
-        if (debugEnabled) {
-          debugData.error = error instanceof Error ? error.message : String(error);
-        }
-
-        // Return error message for LLM
-        return `Search failed: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }. Please try rephrasing your query.`;
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        return `Web research failed: ${errorMessage}. Please try rephrasing your request or try again later.`;
       } finally {
-        // Save debug data if DEBUG is enabled
-        if (debugEnabled) {
-          try {
-            await saveDebugFile(debugData);
-          } catch (debugError) {
-            console.error("[AGENTIC_FETCH] Failed to save debug file:", debugError);
-          }
-        }
+        console.log("[AGENTIC_FETCH] *** SUB-AGENT END ***");
       }
     },
   });
@@ -144,97 +191,6 @@ export function generateStatusMessage(params: AgenticFetchParams | null): string
   if (url) {
     return `Browsing ${url}`;
   } else {
-    const keywords = extractSearchKeywords(prompt);
-    const keywordStr = keywords.length > 0 ? keywords.join(", ") : prompt.substring(0, 30);
-    return `Searching for "${keywordStr}"`;
-  }
-}
-
-/**
- * Save debug data to a markdown file in the .debug directory
- */
-async function saveDebugFile(debugData: any): Promise<void> {
-  const debugDir = ".debug";
-
-  try {
-    // Ensure debug directory exists
-    try {
-      await access(debugDir);
-    } catch {
-      await mkdir(debugDir, { recursive: true });
-    }
-
-    // Generate timestamp in YYYYMMDD_HHMMSS format
-    const now = new Date();
-    const timestamp = now.toISOString().replace(/[-:]/g, "").replace("T", "_").substring(0, 15);
-
-    // Generate short description for filename using small model
-    const descriptionText = await generateShortFilenameDescription(debugData.input.prompt);
-
-    // Format filename: replace spaces with dashes, remove special chars, convert to uppercase
-    const formattedDescription = descriptionText
-      .toUpperCase()
-      .replace(/[^A-Z0-9\s]/g, "") // Remove special characters
-      .replace(/\s+/g, "-") // Replace spaces with dashes
-      .replace(/-+/g, "-") // Collapse multiple dashes
-      .replace(/^-+|-+$/g, ""); // Remove leading/trailing dashes
-
-    const filename = `AGENTIC_FETCH_${timestamp}_${formattedDescription}.md`;
-    const filepath = join(debugDir, filename);
-
-    // Create markdown content
-    let markdownContent = `# Agentic Fetch Debug Data\n\n`;
-    markdownContent += `**Timestamp:** ${debugData.timestamp}\n`;
-    markdownContent += `**Mode:** ${debugData.mode}\n\n`;
-
-    markdownContent += `## Input\n\n`;
-    markdownContent += `**Prompt:** ${debugData.input.prompt}\n`;
-    if (debugData.input.url) {
-      markdownContent += `**URL:** ${debugData.input.url}\n`;
-    }
-    markdownContent += `\n`;
-
-    if (debugData.error) {
-      markdownContent += `## Error\n\n`;
-      markdownContent += `\`\`\`\n${debugData.error}\n\`\`\`\n\n`;
-    } else {
-      markdownContent += `## Result\n\n`;
-      markdownContent += `${debugData.result}\n\n`;
-    }
-
-    if (debugData.details) {
-      if (debugData.mode === "Web Search") {
-        markdownContent += `## Search Details\n\n`;
-        markdownContent += `**Keywords:** ${debugData.details.keywords}\n\n`;
-
-        if (debugData.details.searchResults && debugData.details.searchResults.length > 0) {
-          markdownContent += `### Raw Search Results (${debugData.details.searchResults.length} results)\n\n`;
-          debugData.details.searchResults.forEach((result: any, index: number) => {
-            markdownContent += `#### ${index + 1}. ${result.title}\n`;
-            markdownContent += `- **URL:** ${result.link}\n`;
-            markdownContent += `- **Snippet:** ${result.snippet}\n`;
-            markdownContent += `- **Position:** ${result.position}\n\n`;
-          });
-        }
-
-        markdownContent += `### Formatted Results\n\n`;
-        markdownContent += `\`\`\`\n${debugData.details.formattedResults}\n\`\`\`\n`;
-      } else if (debugData.mode === "URL Analysis") {
-        markdownContent += `## URL Analysis Details\n\n`;
-        markdownContent += `**Page Title:** ${debugData.details.pageTitle}\n`;
-        markdownContent += `**Content Length:** ${debugData.details.contentLength} characters\n\n`;
-
-        if (debugData.details.content) {
-          markdownContent += `### Content (truncated)\n\n`;
-          markdownContent += `\`\`\`markdown\n${debugData.details.content}\n\`\`\`\n`;
-        }
-      }
-    }
-
-    // Write file
-    await writeFile(filepath, markdownContent, "utf-8");
-    console.log(`[AGENTIC_FETCH] Debug file saved: ${filename}`);
-  } catch (error) {
-    console.error("[AGENTIC_FETCH] Failed to save debug file:", error);
+    return `Researching: "${prompt.substring(0, 50)}${prompt.length > 50 ? "..." : ""}"`;
   }
 }

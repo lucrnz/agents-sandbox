@@ -25,8 +25,9 @@ import {
   updateMessage,
   updateConversation,
 } from "./db";
-import { ChatAgent, generateConversationTitle } from "./agent/chat-agent";
+import { ChatAgent } from "./agent/chat-agent";
 import { generateStatusMessage } from "./agent/agentic-fetch.js";
+import { generateConversationTitle } from "./agent/title-generation.js";
 
 // ============================================================================
 // Command Handler Type
