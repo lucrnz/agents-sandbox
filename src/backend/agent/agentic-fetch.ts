@@ -39,14 +39,6 @@ const SUB_AGENT_SYSTEM = `You are a web research assistant with tools to search,
 - **view**: When web_fetch saved a large page to a file and you need to read it
 - **grep**: When you need to find specific information within a large saved file
 
-## Your Working Directory
-
-Your working directory is: /home/agent
-
-IMPORTANT: You can only read and write files within /home/agent.
-All file operations are strictly bounded to this virtual workspace.
-Any attempt to access paths outside /home/agent will be rejected with a "forbidden request" error.
-
 ## Research Strategy
 
 1. **Understand the Request**: Carefully read what information is needed

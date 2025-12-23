@@ -194,8 +194,6 @@ Your working directory is: /home/agent
 IMPORTANT: You can only read and write files within /home/agent.
 All file operations are strictly bounded to this virtual workspace.
 Any attempt to access paths outside /home/agent will be rejected with a "forbidden request" error.
-
-When analyzing large pages, use the view and grep tools to efficiently search through saved files.
 </env>`;
   }
 }
