@@ -55,7 +55,7 @@ class CommandHandlerRegistry {
 
     const validated = registry.validateCommandRequest(commandName, payload);
     const result = await handler(validated, context);
-    return registry.validateCommandResponse(commandName, result);
+    return result;
   }
 
   has(commandName: string): boolean {

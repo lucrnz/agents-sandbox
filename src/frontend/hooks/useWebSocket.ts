@@ -228,9 +228,8 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
         }
 
         try {
-          const validated = command.requestSchema.parse(payload);
           const correlationId = crypto.randomUUID();
-          const message = createCommandMessage(command.name, validated, correlationId);
+          const message = createCommandMessage(command.name, payload, correlationId);
 
           pendingCommands.current.set(correlationId, {
             command: command.name,
