@@ -33,23 +33,27 @@ export interface SearchResult {
 }
 
 // Library path detection
-function getLibraryPath(): string | null {
-  const possiblePaths = [
+function getLibraryPath(): string {
+  const possibleFileNames = [`libgo-lib-ffi.${suffix}`, `go-lib-ffi.${suffix}`];
+
+  const possibleDirectories = [
     // Development paths
-    path.join(process.cwd(), "go-lib-ffi", `libgo-lib-ffi.${suffix}`),
-    path.join(process.cwd(), "src", "backend", "agent", `libgo-lib-ffi.${suffix}`),
+    path.join(process.cwd(), "go-lib-ffi"),
+    path.join(process.cwd(), "src", "backend", "agent"),
     // Production paths
-    path.join(__dirname, `libgo-lib-ffi.${suffix}`),
-    path.join(__dirname, `go-lib-ffi.${suffix === "dll" ? "dll" : suffix}`),
+    path.join(__dirname),
   ];
 
-  for (const libPath of possiblePaths) {
-    if (fs.existsSync(libPath)) {
-      return libPath;
+  for (const directory of possibleDirectories) {
+    for (const fileName of possibleFileNames) {
+      const libPath = path.join(directory, fileName);
+      if (fs.existsSync(libPath)) {
+        return libPath;
+      }
     }
   }
 
-  return null;
+  throw new Error("Library not found");
 }
 
 // FFI wrapper class for go-lib-ffi
@@ -64,11 +68,6 @@ export class GoLibFFIWrapper {
   private loadLibrary(): void {
     try {
       const libPath = getLibraryPath();
-      if (!libPath) {
-        console.warn("[GO_LIB_FFI] Library not found at expected paths");
-        return;
-      }
-
       console.log(`[GO_LIB_FFI] Loading library from: ${libPath}`);
 
       this.lib = dlopen(libPath, {
@@ -117,12 +116,14 @@ export class GoLibFFIWrapper {
   /**
    * Safely frees a C string pointer returned by the Go library
    */
-  private freePtr(ptr: any): void {
+  private freePtr<P>(ptr: P): void {
     if (ptr && this.lib) {
       try {
-        (this.lib.symbols.FreeString as any)(ptr);
+        // Cast down the function. I am not sure why this works.
+        (this.lib.symbols.FreeString as unknown as (ptr: P) => void)(ptr);
       } catch (e) {
         // Ignore errors from FreeString
+        console.error("[GO_LIB_FFI] Error freeing pointer:", e);
       }
     }
   }
@@ -137,11 +138,38 @@ export class GoLibFFIWrapper {
     }
 
     try {
-      const ptr = fn();
-      if (!ptr) return defaultValue;
-      const result = new CString(ptr).toString();
-      this.freePtr(ptr);
-      return result;
+      const result = fn();
+
+      if (!result) return defaultValue;
+
+      let stringResult: string;
+      let ptrToFree: unknown = null;
+
+      if (typeof result === "string") {
+        stringResult = result;
+      } else if (typeof result === "object") {
+        stringResult = String(result);
+        // Bun's cstring return type often returns an object that has a 'ptr' property
+        // containing the actual memory address.
+        if (result.ptr) {
+          ptrToFree = result.ptr;
+        }
+      } else if (typeof result === "number" || typeof result === "bigint") {
+        // @TODO: Research here, for now it throws a typescript error
+        // Raw pointer address - use CString to convert and then free
+        // @ts-ignore
+        stringResult = new CString(result).toString();
+        ptrToFree = result;
+      } else {
+        stringResult = String(result);
+        ptrToFree = result;
+      }
+
+      if (ptrToFree) {
+        this.freePtr(ptrToFree);
+      }
+
+      return stringResult;
     } catch (error) {
       // We don't log here to allow methods to provide better context
       throw error;
@@ -230,10 +258,6 @@ export class GoLibFFIWrapper {
       console.error("[GO_LIB_FFI] Error getting version:", error);
       return "unknown";
     }
-  }
-
-  public getLibraryPath(): string | null {
-    return getLibraryPath();
   }
 }
 
