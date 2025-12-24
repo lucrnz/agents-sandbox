@@ -25,6 +25,22 @@ describe("MarkdownRenderer component", () => {
     expect(link).toHaveTextContent("My Link");
   });
 
+  test("sanitizes dangerous links", () => {
+    const dangerousLinks = [
+      "javascript:alert('XSS')",
+      "data:text/html,<script>alert('XSS')</script>",
+      "vbscript:msgbox('XSS')",
+    ];
+
+    dangerousLinks.forEach((linkUrl) => {
+      const content = `[Dangerous Link](${linkUrl})`;
+      const { getByRole, unmount } = render(<MarkdownRenderer content={content} />);
+      const link = getByRole("link");
+      expect(link).toHaveAttribute("href", "#");
+      unmount();
+    });
+  });
+
   test("renders code blocks", () => {
     const content = "```javascript\nconst x = 1;\n```";
     const { container } = render(<MarkdownRenderer content={content} />);

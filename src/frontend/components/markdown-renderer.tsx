@@ -1,7 +1,7 @@
 import React from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { cn } from "../lib/utils";
+import { cn, sanitizeUrl } from "../lib/utils";
 
 interface MarkdownRendererProps {
   content: string;
@@ -36,16 +36,19 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
           ul: ({ children }) => <ul className="mb-4 list-disc pl-6">{children}</ul>,
           ol: ({ children }) => <ol className="mb-4 list-decimal pl-6">{children}</ol>,
           li: ({ children }) => <li className="mb-1">{children}</li>,
-          a: ({ href, children }) => (
-            <a
-              href={href}
-              className="text-sky-600 underline hover:text-sky-800 dark:text-sky-400 dark:hover:text-sky-600"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {children}
-            </a>
-          ),
+          a: ({ href, children }) => {
+            const safeHref = sanitizeUrl(href);
+            return (
+              <a
+                href={safeHref}
+                className="text-sky-600 underline hover:text-sky-800 dark:text-sky-400 dark:hover:text-sky-600"
+                target={safeHref.startsWith("http") ? "_blank" : undefined}
+                rel={safeHref.startsWith("http") ? "noopener noreferrer" : undefined}
+              >
+                {children}
+              </a>
+            );
+          },
           blockquote: ({ children }) => (
             <blockquote className="mb-4 border-l-4 border-gray-300 pl-4 italic dark:border-neutral-700">
               {children}
