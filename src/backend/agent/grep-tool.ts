@@ -30,14 +30,14 @@ Returns: All matching lines with line numbers.
 SECURITY: Only paths within /home/agent are allowed. Any attempt to access files outside the workspace will be rejected.`,
     inputSchema: z.object({
       path: z.string().describe("File path to search (absolute from /home/agent or relative)"),
-      pattern: z.string().describe("Text pattern to search for"),
+      pattern: z
+        .string()
+        .trim()
+        .min(1, "Pattern cannot be empty or whitespace-only")
+        .describe("Text pattern to search for"),
     }),
     execute: async ({ path, pattern }: { path: string; pattern: string }) => {
       console.log("[GREP] Requesting search in:", path, "pattern:", pattern);
-
-      if (!pattern) {
-        throw new Error("Pattern is required");
-      }
 
       const workspace = getWorkspace();
       if (!workspace) {
@@ -54,7 +54,7 @@ SECURITY: Only paths within /home/agent are allowed. Any attempt to access files
         const lines = content.split("\n");
 
         // Search for pattern (case-insensitive)
-        const patternLower = pattern!.toLowerCase();
+        const patternLower = pattern.toLowerCase();
         const matches: Array<{ line: number; text: string }> = [];
 
         for (let i = 0; i < lines.length; i++) {
