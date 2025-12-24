@@ -4,6 +4,7 @@ import { mkdir, rm } from "fs/promises";
 import { join, resolve, relative, isAbsolute } from "path";
 import { randomUUID } from "crypto";
 import { tmpdir as getOsTmpDir } from "os";
+import { MAX_SUB_AGENT_STEPS } from "./config";
 
 /**
  * Sub-agent workspace configuration
@@ -155,7 +156,7 @@ export class SubAgent {
         model: this.config.model,
         instructions: instructions,
         tools: this.config.tools,
-        stopWhen: stepCountIs(this.config.maxSteps || 10),
+        stopWhen: stepCountIs(this.config.maxSteps || MAX_SUB_AGENT_STEPS),
         onStepFinish: async (stepResult) => {
           // Check for tool calls
           if (stepResult.staticToolCalls && stepResult.staticToolCalls.length > 0) {

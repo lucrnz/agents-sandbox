@@ -7,6 +7,7 @@ import { createWebFetchTool } from "./web-fetch";
 import { createViewTool } from "./view-tool";
 import { createGrepTool } from "./grep-tool";
 import { virtualPathToActual } from "./sub-agent";
+import { MAX_SUB_AGENT_STEPS } from "./config";
 
 export const AgenticFetchParamsSchema = z.object({
   url: z
@@ -125,7 +126,7 @@ The sub-agent autonomously:
           view: viewTool,
           grep: grepTool,
         },
-        maxSteps: 10,
+        maxSteps: MAX_SUB_AGENT_STEPS,
         onToolCall: (toolName: string, args: any) => {
           console.log(`[AGENTIC_FETCH] Sub-agent tool call: ${toolName}`, args);
         },

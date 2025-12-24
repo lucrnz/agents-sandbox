@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { tool } from "ai";
 import { searchDuckDuckGo, formatSearchResults } from "./web-tools.js";
+import { DEFAULT_SEARCH_RESULTS_COUNT } from "./config";
 
 /**
  * Web search tool - performs DuckDuckGo web search
@@ -26,7 +27,7 @@ Returns: Formatted search results with titles, URLs, and snippets.`,
       console.log("[WEB_SEARCH] Searching for:", query);
 
       try {
-        const results = await searchDuckDuckGo(query, 10);
+        const results = await searchDuckDuckGo(query, DEFAULT_SEARCH_RESULTS_COUNT);
         console.log("[WEB_SEARCH] Found", results.length, "results");
 
         if (results.length === 0) {

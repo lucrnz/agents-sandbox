@@ -4,12 +4,15 @@ import { fetchUrlAndConvert } from "./web-tools";
 import { writeFile } from "fs/promises";
 import { join } from "path";
 import type { SubAgentWorkspace } from "./sub-agent";
+import { LARGE_PAGE_THRESHOLD } from "./config";
 
 /**
  * Web fetch tool - fetches URLs and converts to markdown
- * Saves large pages (>50KB) to virtual workspace
+ * Saves large pages to virtual workspace
  */
 export function createWebFetchTool(getWorkspace: () => SubAgentWorkspace | null) {
+  const thresholdKb = Math.round(LARGE_PAGE_THRESHOLD / 1024);
+
   return tool({
     description: `Fetch a webpage and convert it to markdown format.
 
@@ -21,7 +24,7 @@ Use this tool when you need to:
 Input:
 - url: The URL to fetch (required)
 
-Returns: Markdown content of the webpage. For large pages (>50KB), saves to file and returns virtual path (/home/agent/filename.md). Use view tool to read the file.`,
+Returns: Markdown content of the webpage. For large pages (>${thresholdKb}KB), saves to file and returns virtual path (/home/agent/filename.md). Use view tool to read the file.`,
     inputSchema: z.object({
       url: z.string().url().describe("The URL to fetch"),
     }),
@@ -32,9 +35,7 @@ Returns: Markdown content of the webpage. For large pages (>50KB), saves to file
         const content = await fetchUrlAndConvert(url);
         console.log("[WEB_FETCH] Content length:", content.length);
 
-        // If content is large (>50KB), save to file
-        const LARGE_PAGE_THRESHOLD = 50 * 1024; // 50KB
-
+        // If content is large, save to file
         if (content.length > LARGE_PAGE_THRESHOLD) {
           console.log("[WEB_FETCH] Large page detected, saving to file");
 

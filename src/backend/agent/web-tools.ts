@@ -1,9 +1,7 @@
 import { getGoLibFFI, type SearchResult } from "../go-lib-ffi";
+import { BROWSER_USER_AGENT, DEFAULT_SEARCH_RESULTS_COUNT } from "./config";
 
 export type { SearchResult };
-
-const BROWSER_USER_AGENT =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 export async function fetchUrlAndConvert(url: string): Promise<string> {
   console.log("[WEB_TOOLS] Fetching URL:", url);
@@ -102,7 +100,7 @@ function cleanupMarkdown(content: string): string {
 // DuckDuckGo search functionality
 export async function searchDuckDuckGo(
   query: string,
-  maxResults: number = 10,
+  maxResults: number = DEFAULT_SEARCH_RESULTS_COUNT,
 ): Promise<SearchResult[]> {
   console.log("[WEB_TOOLS] Searching DuckDuckGo for:", query, "max results:", maxResults);
   const formData = new URLSearchParams({
