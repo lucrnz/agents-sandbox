@@ -76,6 +76,7 @@ export async function cleanupSubAgentWorkspace(workspace: SubAgentWorkspace): Pr
  */
 export function virtualPathToActual(virtualPath: string, workspace: SubAgentWorkspace): string {
   const { virtualPath: basePath, actualPath: basePathActual } = workspace;
+  let resolvedPath: string;
 
   // If the path is absolute, it must start with the virtual path
   if (isAbsolute(virtualPath)) {
@@ -84,12 +85,26 @@ export function virtualPathToActual(virtualPath: string, workspace: SubAgentWork
     }
 
     // Extract relative path from virtual path
-    const relativePath = virtualPath.slice(basePath.length);
-    return resolve(basePathActual, relativePath);
+    let relativePath = virtualPath.slice(basePath.length);
+
+    // Remove leading slash if present to allow resolution relative to basePathActual
+    if (relativePath.startsWith("/")) {
+      relativePath = relativePath.slice(1);
+    }
+
+    resolvedPath = resolve(basePathActual, relativePath);
+  } else {
+    // If relative path, resolve relative to virtual workspace
+    resolvedPath = resolve(basePathActual, virtualPath);
   }
 
-  // If relative path, resolve relative to virtual workspace
-  return resolve(basePathActual, virtualPath);
+  // Final security check: Ensure the resolved path is still within the actual workspace
+  // This blocks traversal attempts like "../../etc/passwd"
+  if (!resolvedPath.startsWith(basePathActual)) {
+    throw new Error(`❌ Forbidden request: Path traversal detected`);
+  }
+
+  return resolvedPath;
 }
 
 /**
