@@ -117,16 +117,21 @@ func parseResultDiv(div *html.Node) SearchResult {
 
 // extractTextContent extracts text content from HTML nodes
 func extractTextContent(node *html.Node) string {
-	if node.Type == html.TextNode {
-		return strings.TrimSpace(node.Data)
-	}
-
 	var text strings.Builder
-	for child := node.FirstChild; child != nil; child = child.NextSibling {
-		text.WriteString(extractTextContent(child))
+	var walk func(*html.Node)
+	walk = func(n *html.Node) {
+		if n.Type == html.TextNode {
+			text.WriteString(n.Data)
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			walk(c)
+		}
 	}
+	walk(node)
 
-	return strings.TrimSpace(text.String())
+	// Collapse whitespace and trim
+	fields := strings.Fields(text.String())
+	return strings.Join(fields, " ")
 }
 
 // cleanDuckDuckGoURL cleans DuckDuckGo redirect URLs
