@@ -368,9 +368,21 @@ When `DEBUG=true`, agentic fetch requests generate detailed markdown files in th
 
 **Import Path Convention:**
 
+Always use path aliases (`@/`) instead of relative imports, unless the file is in the same directory:
+
 ```typescript
+// ✅ Good - use path aliases for cross-directory imports
 import { Button } from "@/frontend/components/ui/button";
 import { cn } from "@/frontend/lib/utils";
+import { ChatAgent } from "@/backend/agent/chat-agent";
+
+// ✅ Good - relative imports allowed for same-directory files
+import { schema } from "./schema";
+import type { LocalType } from "./types";
+
+// ❌ Bad - don't use relative imports across directories
+import { Button } from "../../components/ui/button";
+import { cn } from "../lib/utils";
 ```
 
 ## Unit Testing
