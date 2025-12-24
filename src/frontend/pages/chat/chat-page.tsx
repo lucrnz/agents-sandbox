@@ -6,6 +6,7 @@ import { useWebSocket } from "@/frontend/hooks/useWebSocket";
 import ConversationSidebar from "@/frontend/components/conversation-sidebar";
 import { MarkdownRenderer } from "@/frontend/components/markdown-renderer";
 import { useDevMode } from "@/frontend/contexts/dev-mode-context";
+import { toast } from "sonner";
 import {
   SendMessage,
   LoadConversation,
@@ -18,6 +19,7 @@ import {
   AgentToolCompleteEvent,
   AgentToolErrorEvent,
   ChatAgentErrorEvent,
+  BackgroundTaskErrorEvent,
   type AIResponsePayload,
   type AIResponseChunkPayload,
   type ConversationUpdatedPayload,
@@ -26,6 +28,7 @@ import {
   type AgentToolCompletePayload,
   type AgentToolErrorPayload,
   type ChatAgentErrorPayload,
+  type BackgroundTaskErrorPayload,
 } from "@/shared/commands";
 
 interface Message {
@@ -247,6 +250,19 @@ export default function ChatPage() {
       }
     });
 
+    const unsubBackgroundTaskError = on<BackgroundTaskErrorPayload>(
+      BackgroundTaskErrorEvent,
+      (payload) => {
+        if (payload.conversationId === currentConversationId) {
+          toast.error(payload.message);
+          // Special case: if ai_response failed, we need to stop loading
+          if (payload.taskType === "ai_response") {
+            setIsLoading(false);
+          }
+        }
+      },
+    );
+
     return () => {
       unsubAIResponse();
       unsubAIResponseChunk();
@@ -256,6 +272,7 @@ export default function ChatPage() {
       unsubAgentToolComplete();
       unsubAgentToolError();
       unsubChatAgentError();
+      unsubBackgroundTaskError();
     };
   }, [on, currentConversationId]);
 

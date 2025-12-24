@@ -13,6 +13,7 @@ import { addMessage, updateMessage, updateConversation, getConversationWithMessa
 import { ChatAgent } from "../agent/chat-agent";
 import { generateStatusMessage } from "../agent/agentic-fetch.js";
 import { generateConversationTitle } from "../agent/title-generation.js";
+import { BackgroundTaskTracker } from "./background-task-tracker";
 
 export type ChatOrchestratorContext = {
   ws: ServerWebSocket<{ conversationId?: string }>;
@@ -22,10 +23,12 @@ export type ChatOrchestratorContext = {
 export class ChatOrchestrator {
   private ws: ServerWebSocket<{ conversationId?: string }>;
   private conversationId: string;
+  private taskTracker: BackgroundTaskTracker;
 
   constructor(context: ChatOrchestratorContext) {
     this.ws = context.ws;
     this.conversationId = context.conversationId;
+    this.taskTracker = new BackgroundTaskTracker();
   }
 
   /**
@@ -33,16 +36,22 @@ export class ChatOrchestrator {
    */
   async processUserMessage(content: string) {
     // 1. Title generation (if applicable)
-    // We don't await this to keep the response fast, but it runs in background
-    this.generateTitleIfNeeded(content).catch((err) => {
-      console.error("[CHAT_ORCHESTRATOR] Title generation failed:", err);
-    });
+    // We track this background task for observability and error handling
+    this.taskTracker.track(
+      "title_generation",
+      this.conversationId,
+      this.generateTitleIfNeeded(content),
+      this.ws,
+    );
 
     // 2. AI Response generation
-    // This is also fire-and-forget from the perspective of the initial command response
-    this.streamAIResponse(content).catch((err) => {
-      console.error("[CHAT_ORCHESTRATOR] AI Response streaming failed:", err);
-    });
+    // This is also tracked as a background task
+    this.taskTracker.track(
+      "ai_response",
+      this.conversationId,
+      this.streamAIResponse(content),
+      this.ws,
+    );
   }
 
   /**

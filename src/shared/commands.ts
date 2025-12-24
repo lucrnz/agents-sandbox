@@ -140,6 +140,16 @@ export const ChatAgentErrorEvent = registry.event(
   }),
 );
 
+export const BackgroundTaskErrorEvent = registry.event(
+  "background_task_error",
+  z.object({
+    conversationId: z.string(),
+    taskType: z.enum(["title_generation", "ai_response"]),
+    message: z.string(),
+    timestamp: z.string().datetime(),
+  }),
+);
+
 // ============================================================================
 // Type Exports
 // ============================================================================
@@ -165,3 +175,4 @@ export type AgentToolStartPayload = z.infer<typeof AgentToolStartEvent.payloadSc
 export type AgentToolCompletePayload = z.infer<typeof AgentToolCompleteEvent.payloadSchema>;
 export type AgentToolErrorPayload = z.infer<typeof AgentToolErrorEvent.payloadSchema>;
 export type ChatAgentErrorPayload = z.infer<typeof ChatAgentErrorEvent.payloadSchema>;
+export type BackgroundTaskErrorPayload = z.infer<typeof BackgroundTaskErrorEvent.payloadSchema>;

@@ -3,6 +3,7 @@ import { lazy } from "react";
 import { GlobalLayout } from "./global-layout";
 import { DevModeProvider } from "./contexts/dev-mode-context";
 import { DevModeOverlay } from "./components/dev-mode-overlay";
+import { Toaster } from "@/frontend/components/ui/sonner";
 
 const HomePage = lazy(() => import("./pages/home/home-page"));
 const ChatPage = lazy(() => import("./pages/chat/chat-page"));
@@ -13,6 +14,7 @@ function Providers({ children }: { children: React.ReactNode }) {
   return (
     <DevModeProvider>
       {children}
+      <Toaster />
       {process.env.NODE_ENV !== "production" && <DevModeOverlay />}
     </DevModeProvider>
   );
