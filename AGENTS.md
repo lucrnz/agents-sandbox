@@ -1,9 +1,7 @@
 ## Project Overview
-
 "AI Command Center" - A meta-app designed as a controlled sandbox for training AI agents to interact with UI elements. A simulated digital environment where agents learn multi-step reasoning, action planning, and tool use in a safe, predictable space.
 
-## Documentation Structure (IMPORTANT)
-
+## Documentation Structure
 ### Root Directory Markdown Files
 
 The root directory must contain **ONLY TWO** markdown files:
@@ -12,7 +10,6 @@ The root directory must contain **ONLY TWO** markdown files:
 2. **README.md** - Human-readable project overview and user-facing documentation
 
 ### CLAUDE.md
-
 **CLAUDE.md** is exclusively for the Claude Code CLI tool. It must always be a **symbolic link** to AGENTS.md, not a separate file:
 
 **Never** edit CLAUDE.md directly - it should always point to AGENTS.md so both human and AI agents see consistent documentation.
@@ -30,11 +27,11 @@ All documentation intended for AI agents (implementation guides, architecture de
 **Keep the root clean** - Only AGENTS.md, README.md, and the CLAUDE.md symlink belong in the root directory.
 
 ## Implementation Plans
+IMPORTANT: If the user didn't ask for a plan, do not create it.
 
-For complex features, refactoring, or non-trivial bug fixes, create structured implementation plans in `.llm/plans/`. Plans break down large tasks into executable steps with clear context, affected files, testing strategies, and potential risks.
+Plans break down large tasks into executable steps with clear context, affected files, testing strategies, and potential risks.
 
-**Quick Reference:**
-
+Quick Reference:
 - **Create plan:** `.llm/plans/PLAN_YYYYMMdd_DESCRIPTION.md`
 - **Execute:** Follow steps sequentially, mark completed with `[x]`
 - **Complete:** Move to `.llm/plans/done/` when finished
@@ -83,55 +80,7 @@ bun run build.ts --outdir=dist --minify --sourcemap=linked --external=react,reac
 - **Hot Module Replacement** - Built into Bun's dev server
 - **Environment variables** - Auto-loaded from `.env`, no dotenv needed
 
-## Code Organization
-
-```
-src/
-├── backend/                    # Server-side code
-│   ├── index.ts               # Main server entry point
-│   ├── command-handlers.ts    # WebSocket command handlers
-│   ├── agent/                 # AI agent implementations
-│   │   ├── chat-agent.ts      # Main chat agent with xAI/Grok
-│   │   ├── agentic-fetch.ts   # Web research sub-agent (spawns sub-agent with tools)
-│   │   ├── sub-agent.ts       # Sub-agent base class with virtual workspace
-│   │   ├── web-search.ts      # Web search tool (DuckDuckGo)
-│   │   ├── web-fetch.ts       # Web fetch tool (URL → markdown)
-│   │   ├── view-tool.ts       # View file contents tool (with security boundaries)
-│   │   ├── grep-tool.ts       # Search within files tool (with security boundaries)
-│   │   ├── title-generation.ts # Conversation title generation
-│   │   ├── model-config.ts    # AI model configurations
-│   │   └── web-tools.ts       # Web scraping utilities (shared)
-│   └── db/                    # Database layer
-│       ├── index.ts           # Database connection
-│       ├── schema.ts          # Drizzle schema definitions
-│       ├── queries.ts         # Database query functions
-│       └── migrate.ts         # Database migrations
-├── frontend/                  # Client-side React app
-│   ├── app.tsx                # Main app component with routing
-│   ├── frontend.tsx           # React DOM render entry
-│   ├── index.html             # HTML template
-│   ├── pages/                 # Route pages
-│   │   ├── home/              # Home page
-│   │   ├── chat/              # Chat interface
-│   │   └── not-found/         # 404 page
-│   ├── components/            # Reusable React components
-│   │   ├── ui/                # shadcn/ui style components
-│   │   ├── conversation-sidebar.tsx
-│   │   └── markdown-renderer.tsx
-│   ├── hooks/                 # Custom React hooks
-│   │   └── useWebSocket.ts    # WebSocket connection hook
-│   ├── lib/                   # Frontend utilities
-│   │   └── utils.ts           # Shared utilities (cn, etc.)
-│   ├── sandbox/               # Sandbox apps for agent training
-│   │   └── todo-app/          # Example sandbox app
-│   └── globals.css            # Global styles
-└── shared/                    # Shared between frontend/backend
-    ├── command-system.ts      # WebSocket message schemas & types
-    ├── commands.ts            # Command/event definitions
-```
-
 ## WebSocket Command System
-
 ### Architecture
 
 The app uses a typed WebSocket command system for client-server communication:
@@ -218,79 +167,7 @@ bunx drizzle-kit studio
 
 ## AI Agent System
 
-### Chat Agent (`src/backend/agent/chat-agent.ts`)
-
-- **Model**: xAI Grok-4-1-fast-reasoning
-- **Capabilities**: Natural language processing, web search, content analysis
-- **Tools**: `agentic_fetch` for web browsing/search
-- **Streaming**: Real-time response streaming with status updates
-
-### Agentic Fetch (Sub-Agent Pattern)
-
-**Architecture:**
-
-The agentic_fetch tool is implemented as a **sub-agent** - an autonomous AI agent that operates in a virtual sandbox to perform web research tasks.
-
-- **Model**: xAI Grok-4-1-fast-reasoning
-- **Pattern**: Recursive sub-agent (ChatAgent spawns Sub-Agent)
-
-```
-User → ChatAgent (Parent)
-         ↓ (invokes agentic_fetch)
-       Sub-Agent (with web_search, web_fetch, view, grep)
-         ↓ (autonomous execution in virtual workspace /home/agent)
-       Web Tools (DuckDuckGo, HTTP fetch, file operations)
-```
-
-**Virtual Workspace:**
-
-- **Virtual Path**: `/home/agent` - made-up directory for the sub-agent (does NOT exist on host OS)
-- **Actual Path**: Maps to OS temp directory (e.g., `/tmp/agents-sandbox-{timestamp}`)
-- **Security**: All filesystem tools (view, grep, web-fetch) are strictly bounded to `/home/agent`
-- **Cleanup**: Temp directory is automatically deleted when sub-agent completes
-
-**Critical Security Note:**
-
-`/home/agent` is a **virtual sandbox directory** - it does not exist on the host operating system. The sub-agent believes it's working in `/home/agent`, but all file operations are mapped to an actual OS temp directory. This is an implementation detail for sandboxing, not a real path on the filesystem.
-
-**Sub-Agent Tools:**
-
-1. **`web_search`** - DuckDuckGo web search to find information
-2. **`web_fetch`** - Fetch web pages and convert to markdown
-   - Saves large pages (>50KB) to virtual `/home/agent/` path
-   - Returns virtual path for use with view/grep tools
-3. **`view`** - Read file contents from virtual workspace
-   - **Security**: Validates all paths, rejects access outside `/home/agent`
-   - Only allows paths starting with `/home/agent` or relative paths
-4. **`grep`** - Search within files for specific patterns
-   - **Security**: Same path validation as view tool
-   - Efficiently search large saved files
-
-**Sub-Agent Capabilities:**
-
-- Performs multiple searches in sequence
-- Follows relevant links from search results
-- Analyzes fetched content to answer questions
-- Uses view/grep tools for efficient large-page analysis
-- Returns structured responses with sources
-
-**Tool Usage from ChatAgent:**
-
-```typescript
-// ChatAgent uses agentic_fetch as a simple tool
-const { agentic_fetch } = tools;
-await agentic_fetch({ prompt: "What are the main features of Python 3.12?" });
-```
-
-**Security Enforcement:**
-
-All filesystem tools (view, grep, web-fetch) implement strict path validation:
-
-- Only paths starting with `/home/agent` or relative paths are allowed
-- Paths outside sandbox are rejected with "forbidden request" error
-- Path traversal attempts (`../`, absolute paths) are blocked
-- Virtual paths are mapped to actual OS temp directories
-- No tool can bypass this validation (security-first design)
+Read the [AI Agent System Documentation](.llm/docs/AI_AGENT_SYSTEM_DOCUMENTATION.md) to understand the current architecture and implementation of the AI Agent System.
 
 ## Frontend Patterns
 
