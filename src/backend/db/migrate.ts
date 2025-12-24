@@ -1,8 +1,7 @@
 import { Database } from "bun:sqlite";
 import { migrate } from "drizzle-orm/bun-sqlite/migrator";
 import { drizzle } from "drizzle-orm/bun-sqlite";
-import { readFileSync, readdirSync } from "fs";
-import { join } from "path";
+import { readdirSync } from "fs";
 
 export async function runMigrations() {
   const sqlite = new Database(process.env.DB_FILE_NAME || "sqlite.db");
@@ -27,8 +26,8 @@ export async function runMigrations() {
       applySchemaDirectly(sqlite);
     } else {
       // Run migrations
-      await db.run(readFileSync(join(migrationsPath, migrationFiles[0] || ""), "utf-8"));
-      console.log("Migration completed");
+      console.log(`Found ${migrationFiles.length} migration(s), running...`);
+      migrate(db, { migrationsFolder: migrationsPath });
     }
   } catch (error) {
     console.error("Migration failed:", error);
