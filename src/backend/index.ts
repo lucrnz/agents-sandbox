@@ -1,11 +1,11 @@
 import { serve, type Server, type ServerWebSocket } from "bun";
-import index from "../frontend/index.html";
+import index from "@/frontend/index.html";
 import {
   WebSocketMessageSchema,
   type CommandMessage,
   createCommandResult,
   createCommandError,
-} from "../shared/command-system";
+} from "@/shared/command-system";
 import { commandHandlers } from "./command-handlers";
 
 const server = serve<{ conversationId?: string }>({

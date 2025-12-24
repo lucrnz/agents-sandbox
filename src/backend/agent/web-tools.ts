@@ -1,4 +1,4 @@
-import { getGoLibFFI, type SearchResult } from "../go-lib-ffi";
+import { getGoLibFFI, type SearchResult } from "@/backend/go-lib-ffi";
 import { BROWSER_USER_AGENT, DEFAULT_SEARCH_RESULTS_COUNT } from "./config";
 
 export type { SearchResult };

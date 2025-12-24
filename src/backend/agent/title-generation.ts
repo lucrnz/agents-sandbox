@@ -1,7 +1,7 @@
 import { generateText, Output } from "ai";
 import { smallModel } from "./model-config.js";
 import z from "zod";
-import { getGoLibFFI } from "../go-lib-ffi.js";
+import { getGoLibFFI } from "@/backend/go-lib-ffi.js";
 
 /**
  * Generate conversation title using small model

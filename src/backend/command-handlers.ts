@@ -1,29 +1,13 @@
 import type { ServerWebSocket } from "bun";
-import {
-  registry,
-  createCommandResult,
-  createCommandError,
-  createEventMessage,
-  type CommandDef,
-} from "../shared/command-system";
-import {
-  SendMessage,
-  LoadConversation,
-  GetConversations,
-  AIResponseEvent,
-  ConversationUpdatedEvent,
-  AgentToolStartEvent,
-  AgentToolCompleteEvent,
-  AgentToolErrorEvent,
-  ChatAgentErrorEvent,
-} from "../shared/commands";
+import { registry, type CommandDef } from "@/shared/command-system";
+import { SendMessage, LoadConversation, GetConversations } from "@/shared/commands";
 import {
   getOrCreateConversation,
   getConversationWithMessages,
   getConversationsWithMessages,
   addMessage,
-} from "./db";
-import { ChatOrchestrator } from "./services/chat-orchestrator";
+} from "@/backend/db";
+import { ChatOrchestrator } from "@/backend/services/chat-orchestrator";
 
 // ============================================================================
 // Command Handler Type

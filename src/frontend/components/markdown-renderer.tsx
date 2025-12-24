@@ -1,7 +1,7 @@
 import React from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { cn, sanitizeUrl } from "../lib/utils";
+import { cn, sanitizeUrl } from "@/frontend/lib/utils";
 
 interface MarkdownRendererProps {
   content: string;

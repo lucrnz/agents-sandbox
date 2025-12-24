@@ -1,5 +1,5 @@
 import type { ServerWebSocket } from "bun";
-import { createEventMessage } from "../../shared/command-system";
+import { createEventMessage } from "@/shared/command-system";
 import {
   AIResponseEvent,
   AIResponseChunkEvent,
@@ -8,11 +8,16 @@ import {
   AgentToolCompleteEvent,
   AgentToolErrorEvent,
   ChatAgentErrorEvent,
-} from "../../shared/commands";
-import { addMessage, updateMessage, updateConversation, getConversationWithMessages } from "../db";
-import { ChatAgent } from "../agent/chat-agent";
-import { generateStatusMessage } from "../agent/agentic-fetch.js";
-import { generateConversationTitle } from "../agent/title-generation.js";
+} from "@/shared/commands";
+import {
+  addMessage,
+  updateMessage,
+  updateConversation,
+  getConversationWithMessages,
+} from "@/backend/db";
+import { ChatAgent } from "@/backend/agent/chat-agent";
+import { generateStatusMessage } from "@/backend/agent/agentic-fetch.js";
+import { generateConversationTitle } from "@/backend/agent/title-generation.js";
 import { BackgroundTaskTracker } from "./background-task-tracker";
 
 export type ChatOrchestratorContext = {

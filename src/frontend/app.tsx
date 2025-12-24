@@ -1,14 +1,14 @@
 import { Route, Switch } from "wouter";
 import { lazy } from "react";
 import { GlobalLayout } from "./global-layout";
-import { DevModeProvider } from "./contexts/dev-mode-context";
-import { DevModeOverlay } from "./components/dev-mode-overlay";
+import { DevModeProvider } from "@/frontend/contexts/dev-mode-context";
+import { DevModeOverlay } from "@/frontend/components/dev-mode-overlay";
 import { Toaster } from "@/frontend/components/ui/sonner";
 
-const HomePage = lazy(() => import("./pages/home/home-page"));
-const ChatPage = lazy(() => import("./pages/chat/chat-page"));
-const TodoAppPage = lazy(() => import("./sandbox/todo-app/TodoApp"));
-const NotFoundPage = lazy(() => import("./pages/not-found/not-found-page"));
+const HomePage = lazy(() => import("@/frontend/pages/home/home-page"));
+const ChatPage = lazy(() => import("@/frontend/pages/chat/chat-page"));
+const TodoAppPage = lazy(() => import("@/frontend/sandbox/todo-app/TodoApp"));
+const NotFoundPage = lazy(() => import("@/frontend/pages/not-found/not-found-page"));
 
 function Providers({ children }: { children: React.ReactNode }) {
   return (

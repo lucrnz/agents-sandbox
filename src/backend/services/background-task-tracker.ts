@@ -1,6 +1,6 @@
 import type { ServerWebSocket } from "bun";
-import { createEventMessage } from "../../shared/command-system";
-import { BackgroundTaskErrorEvent } from "../../shared/commands";
+import { createEventMessage } from "@/shared/command-system";
+import { BackgroundTaskErrorEvent } from "@/shared/commands";
 
 export type TaskType = "title_generation" | "ai_response";
 export type TaskState = "pending" | "completed" | "failed";
