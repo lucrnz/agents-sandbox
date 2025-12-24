@@ -136,6 +136,9 @@ The sub-agent autonomously:
             console.log(`[AGENTIC_FETCH] Sub-agent tool result: ${toolName}`);
           }
         },
+        onWorkspaceCreated: (workspace) => {
+          currentWorkspace = workspace;
+        },
       });
 
       // Build sub-agent prompt based on mode

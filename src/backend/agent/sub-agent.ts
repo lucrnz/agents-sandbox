@@ -24,6 +24,7 @@ export interface SubAgentConfig {
   maxSteps?: number;
   onToolCall?: (toolName: string, args: any) => void;
   onToolResult?: (toolName: string, result: any, error?: Error) => void;
+  onWorkspaceCreated?: (workspace: SubAgentWorkspace) => void;
 }
 
 /**
@@ -124,6 +125,11 @@ export class SubAgent {
 
     // Create workspace
     this.workspace = await createSubAgentWorkspace();
+
+    // Notify caller that workspace is ready
+    if (this.config.onWorkspaceCreated) {
+      this.config.onWorkspaceCreated(this.workspace);
+    }
 
     try {
       // Build system prompt with environment info
