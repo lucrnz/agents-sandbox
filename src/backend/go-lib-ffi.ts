@@ -139,7 +139,7 @@ export class GoLibFFIWrapper {
     try {
       const ptr = fn();
       if (!ptr) return defaultValue;
-      const result = ptr.toString();
+      const result = new CString(ptr).toString();
       this.freePtr(ptr);
       return result;
     } catch (error) {
