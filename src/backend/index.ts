@@ -58,14 +58,15 @@ const server = serve<{ conversationId?: string }>({
             const response = createCommandResult(command.command, command.correlationId, result);
             ws.send(JSON.stringify(response));
           } catch (error) {
-            console.error(`Command ${command.command} failed:`, error);
+            const errorId = crypto.randomUUID();
+            console.error(`[COMMAND_ERROR] ${command.command} failed (ID: ${errorId}):`, error);
 
             const errorResponse = createCommandError(
               command.command,
               command.correlationId,
               "COMMAND_FAILED",
-              error instanceof Error ? error.message : "Unknown error",
-              error,
+              "An internal error occurred. Please try again.",
+              { errorId },
             );
             ws.send(JSON.stringify(errorResponse));
           }

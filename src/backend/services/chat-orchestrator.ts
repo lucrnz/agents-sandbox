@@ -137,10 +137,16 @@ export class ChatOrchestrator {
           }
         },
         onCriticalError: (error, originalError) => {
+          const errorId = crypto.randomUUID();
+          console.error(
+            `[CHAT_ORCHESTRATOR] Critical Agent Error (ID: ${errorId}):`,
+            originalError || error,
+          );
+
           this.emitEvent(ChatAgentErrorEvent.name, {
             conversationId: this.conversationId,
-            error: error.message,
-            originalError,
+            error: "The AI agent encountered a critical error.",
+            originalError: `Error ID: ${errorId}`,
             canRetry: true,
             timestamp: new Date().toISOString(),
           });
