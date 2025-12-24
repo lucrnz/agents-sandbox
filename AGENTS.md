@@ -439,10 +439,26 @@ describe("Button component", () => {
 
 For detailed API reference and examples, see the [Bun test documentation](./node_modules/bun-types/docs/test/index.mdx)
 
+### Time Mocking
+
+Bun uses `setSystemTime` instead of Jest's `useFakeTimers()`. Import it directly from `bun:test`:
+
+```typescript
+import { setSystemTime } from "bun:test";
+
+setSystemTime(new Date("2024-01-01T12:00:00.000Z")); // Set mock time
+setSystemTime(); // Reset to real time
+```
+
+**Note:** This only mocks `Date.now()` and `new Date()`, not `setTimeout`/`setInterval`.
+
+For detailed patterns and workarounds, see [`.llm/docs/BUN_TESTS_TIME_MOCKING_README_INSTEAD_OF_USING_JEST_FAKE_TIMERS.md`](./.llm/docs/BUN_TESTS_TIME_MOCKING_README_INSTEAD_OF_USING_JEST_FAKE_TIMERS.md).
+
 ### Unit Tests Final Remarks
 
 - DO NOT install jsdom
 - DO NOT install jest
+- DO NOT use `jest.useFakeTimers()` - use `setSystemTime` from `bun:test` instead
 
 ## Go Library FFI (`go-lib-ffi/`)
 
