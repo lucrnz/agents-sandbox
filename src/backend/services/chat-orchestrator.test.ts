@@ -1,57 +1,102 @@
-import { test, expect, describe, mock, beforeEach, afterEach } from "bun:test";
+import { test, expect, describe, mock, beforeEach, afterEach, spyOn, type Mock } from "bun:test";
 import { ChatOrchestrator } from "./chat-orchestrator";
-
-// Mock DB
-const mockAddMessage = mock(async () => ({ id: 1, role: "assistant", content: "Thinking..." }));
-const mockUpdateMessage = mock(async () => ({ id: 1, role: "assistant", content: "Done" }));
-const mockUpdateConversation = mock(async () => ({ id: "conv-id", title: "New Title" }));
-const mockGetConversationWithMessages = mock(async () => ({
-  id: "conv-id",
-  title: "New chat 12/23/2025",
-  messages: [{ id: 1, role: "user", content: "Hello" }],
-}));
-
-mock.module("@/backend/db", () => ({
-  addMessage: mockAddMessage,
-  updateMessage: mockUpdateMessage,
-  updateConversation: mockUpdateConversation,
-  getConversationWithMessages: mockGetConversationWithMessages,
-}));
-
-// Mock Title Generation
-const mockGenerateTitle = mock(async () => "Generated Title");
-mock.module("@/backend/agent/title-generation.js", () => ({
-  generateConversationTitle: mockGenerateTitle,
-}));
-
-// Mock ChatAgent
-class MockChatAgent {
-  generateResponse = mock(async function* (content: string) {
-    yield "Hello ";
-    yield "world!";
-  });
-}
-mock.module("@/backend/agent/chat-agent", () => ({
-  ChatAgent: MockChatAgent,
-}));
+import * as db from "@/backend/db";
+import * as titleGen from "@/backend/agent/title-generation.js";
+import { ChatAgent } from "@/backend/agent/chat-agent";
+import type { ServerWebSocket } from "bun";
+import type { EventMessage } from "@/shared/command-system";
+import type { AIResponseChunkPayload } from "@/shared/commands";
 
 describe("ChatOrchestrator", () => {
-  let ws: any;
+  let ws: ServerWebSocket<{ conversationId?: string }>;
   let orchestrator: ChatOrchestrator;
+  let spies: Mock<any>[] = [];
 
   beforeEach(() => {
     ws = {
-      send: mock(() => {}),
+      send: mock((_data: string | Uint8Array) => {}),
       data: { conversationId: "conv-id" },
-    };
+    } as unknown as ServerWebSocket<{ conversationId?: string }>;
     orchestrator = new ChatOrchestrator({ ws, conversationId: "conv-id" });
 
-    mockAddMessage.mockClear();
-    mockUpdateMessage.mockClear();
-    mockUpdateConversation.mockClear();
-    mockGetConversationWithMessages.mockClear();
-    mockGenerateTitle.mockClear();
-    ws.send.mockClear();
+    // Setup spies
+    spies.push(
+      spyOn(db, "addMessage").mockImplementation(
+        async (conversationId, role, content) =>
+          ({
+            id: 1,
+            conversationId,
+            role,
+            content,
+            createdAt: new Date(),
+          }) as const,
+      ),
+    );
+    spies.push(
+      spyOn(db, "updateMessage").mockImplementation(
+        async (id, content) =>
+          ({
+            id,
+            content,
+            conversationId: "conv-id",
+            role: "assistant",
+            createdAt: new Date(),
+          }) as const,
+      ),
+    );
+    spies.push(
+      spyOn(db, "updateConversation").mockImplementation(
+        async (id, data) =>
+          ({
+            id,
+            title: data.title || "New Title",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }) as const,
+      ),
+    );
+    spies.push(
+      spyOn(db, "getConversationWithMessages").mockImplementation(
+        async (id) =>
+          ({
+            id,
+            title: "New chat 12/23/2025",
+            messages: [
+              {
+                id: 1,
+                role: "user" as const,
+                content: "Hello",
+                conversationId: id,
+                createdAt: new Date(),
+              },
+            ],
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }) as const,
+      ),
+    );
+
+    spies.push(
+      spyOn(titleGen, "generateConversationTitle").mockImplementation(
+        async () => "Generated Title",
+      ),
+    );
+
+    spies.push(
+      spyOn(ChatAgent.prototype, "generateResponse").mockImplementation(async function* (
+        _content: string,
+      ) {
+        yield "Hello ";
+        yield "world!";
+      }),
+    );
+  });
+
+  afterEach(() => {
+    for (const spy of spies) {
+      spy.mockRestore();
+    }
+    spies = [];
   });
 
   test("processUserMessage should trigger title generation and AI response", async () => {
@@ -62,25 +107,32 @@ describe("ChatOrchestrator", () => {
     // For now, let's just wait a bit or mock the tracker.
     await new Promise((resolve) => setTimeout(resolve, 50));
 
-    expect(mockGetConversationWithMessages).toHaveBeenCalledWith("conv-id");
-    expect(mockGenerateTitle).toHaveBeenCalledWith("Hello agent");
-    expect(mockUpdateConversation).toHaveBeenCalled();
-    expect(mockAddMessage).toHaveBeenCalled();
+    expect(db.getConversationWithMessages).toHaveBeenCalledWith("conv-id");
+    expect(titleGen.generateConversationTitle).toHaveBeenCalledWith("Hello agent");
+    expect(db.updateConversation).toHaveBeenCalled();
+    expect(db.addMessage).toHaveBeenCalled();
     expect(ws.send).toHaveBeenCalled();
   });
 
   test("should handle AI response streaming", async () => {
-    // Use any to access private methods
-    await (orchestrator as any).streamAIResponse("Hello");
+    // Access private method for testing
+    const privateOrchestrator = orchestrator as unknown as {
+      streamAIResponse: (content: string) => Promise<void>;
+    };
+    await privateOrchestrator.streamAIResponse("Hello");
 
-    expect(mockAddMessage).toHaveBeenCalledWith("conv-id", "assistant", "🤔 Thinking...");
-    expect(mockUpdateMessage).toHaveBeenCalled();
+    expect(db.addMessage).toHaveBeenCalledWith("conv-id", "assistant", "🤔 Thinking...");
+    expect(db.updateMessage).toHaveBeenCalled();
     // 2 chunks + final cleanup = at least 3 calls
-    expect(mockUpdateMessage.mock.calls.length).toBeGreaterThanOrEqual(2);
+    const updateMessageMock = db.updateMessage as Mock<typeof db.updateMessage>;
+    expect(updateMessageMock.mock.calls.length).toBeGreaterThanOrEqual(2);
 
     // Check if chunks were sent via WS
-    const sentEvents = ws.send.mock.calls.map((c: any) => JSON.parse(c[0]));
-    const chunkEvents = sentEvents.filter((e: any) => e.event === "ai_response_chunk");
+    const sendMock = ws.send as Mock<typeof ws.send>;
+    const sentEvents = sendMock.mock.calls.map(
+      (c) => JSON.parse(c[0] as string) as EventMessage<AIResponseChunkPayload>,
+    );
+    const chunkEvents = sentEvents.filter((e) => e.event === "ai_response_chunk");
     expect(chunkEvents).toHaveLength(2);
     expect(chunkEvents[0].payload.delta).toBe("Hello ");
     expect(chunkEvents[1].payload.delta).toBe("world!");
