@@ -30,7 +30,6 @@ export async function fetchUrlAndConvert(url: string): Promise<string> {
     console.log("[WEB_TOOLS] Processing HTML content");
     const cleanedHtml = removeNoisyElements(content);
     content = convertHtmlToMarkdown(cleanedHtml);
-    content = cleanupMarkdown(content);
     console.log("[WEB_TOOLS] Processed markdown length:", content.length);
   }
   // Format JSON
@@ -81,20 +80,6 @@ function convertHtmlToMarkdown(html: string): string {
     console.error("[WEB_TOOLS] Go library failed:", error);
     throw error;
   }
-}
-
-function cleanupMarkdown(content: string): string {
-  // Collapse multiple blank lines
-  content = content.replace(/\n{3,}/g, "\n\n");
-
-  // Remove trailing whitespace from each line
-  content = content
-    .split("\n")
-    .map((line) => line.trimEnd())
-    .join("\n");
-
-  // Trim leading/trailing whitespace
-  return content.trim();
 }
 
 // DuckDuckGo search functionality
