@@ -89,48 +89,89 @@ Title:`,
 }
 
 /**
- * Extract search keywords from user query
+ * Extract search keywords from user query using the small model
  */
-export function extractSearchKeywords(query: string): string[] {
-  // Simple keyword extraction - in real app would use NLP
-  const stopWords = [
-    "what",
-    "how",
-    "where",
-    "when",
-    "why",
-    "which",
-    "who",
-    "the",
-    "a",
-    "an",
-    "and",
-    "or",
-    "but",
-    "in",
-    "on",
-    "at",
-    "to",
-    "for",
-    "of",
-    "with",
-    "by",
-    "from",
-    "about",
-    "search",
-    "find",
-    "look",
-    "looking",
-    "help",
-    "me",
-  ];
+export async function extractSearchKeywords(query: string): Promise<string[]> {
+  try {
+    const goLib = getGoLibFFI();
+    if (!goLib) {
+      throw new Error("Go library not available for keyword extraction");
+    }
 
-  return query
-    .toLowerCase()
-    .replace(/[^\w\s]/g, " ") // Keep only letters and spaces
-    .split(/\s+/)
-    .filter((word) => word.length > 2 && !stopWords.includes(word))
-    .slice(0, 5); // Max 5 keywords
+    const { text } = await generateText({
+      model: smallModel,
+      prompt: `Extract 3-5 most important search keywords from this query. 
+      Return them as a space-separated list of single words.
+      No punctuation, no special characters, no explanations.
+      
+      Query: ${query}
+      
+      Keywords:`,
+      maxRetries: 1,
+    });
+
+    const keywords = goLib
+      .stripMarkdown(text)
+      .trim()
+      .split(/\s+/)
+      .filter((word) => word.length > 0)
+      .map((word) => word.toLowerCase().replace(/[^\w]/g, ""))
+      .filter((word) => word.length > 1)
+      .slice(0, 5);
+
+    if (keywords.length === 0) {
+      throw new Error("No keywords found");
+    }
+
+    return keywords;
+  } catch (error) {
+    console.error("Keyword extraction failed:", error);
+    // Fallback
+    // Simple keyword extraction - in real app would use NLP
+    const stopWords = [
+      "what",
+      "how",
+      "where",
+      "when",
+      "why",
+      "which",
+      "who",
+      "the",
+      "a",
+      "an",
+      "and",
+      "or",
+      "but",
+      "in",
+      "on",
+      "at",
+      "to",
+      "for",
+      "of",
+      "with",
+      "by",
+      "from",
+      "about",
+      "search",
+      "find",
+      "look",
+      "looking",
+      "help",
+      "me",
+      "are",
+      "is",
+      "was",
+      "were",
+      "am",
+    ];
+
+    return query
+      .toLowerCase()
+      .replace(/[^\w\s]/g, " ") // Keep only letters and spaces
+      .split(/\s+/)
+      .filter((word) => word.length > 2 && !stopWords.includes(word))
+      .slice(0, 5); // Max 5 keywords
+  }
 }
 
 /**
@@ -171,7 +212,7 @@ Short description:`,
 
     // If the model returned something empty or just spaces, use a fallback
     if (!cleaned || cleaned.length === 0) {
-      const keywords = extractSearchKeywords(content);
+      const keywords = await extractSearchKeywords(content);
       return keywords.slice(0, 3).join(" ");
     }
 
@@ -179,7 +220,7 @@ Short description:`,
   } catch (error) {
     console.error("Filename description generation failed:", error);
     // Fallback to keywords
-    const keywords = extractSearchKeywords(content);
+    const keywords = await extractSearchKeywords(content);
     return keywords.slice(0, 3).join(" ");
   }
 }
