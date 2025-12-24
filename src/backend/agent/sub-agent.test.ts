@@ -1,11 +1,14 @@
-import { test, expect, describe, beforeAll, afterAll } from "bun:test";
+import { test, expect, describe, beforeAll, afterAll, mock } from "bun:test";
 import {
   virtualPathToActual,
+  actualPathToVirtual,
   createSubAgentWorkspace,
   cleanupSubAgentWorkspace,
   type SubAgentWorkspace,
+  SubAgent,
 } from "./sub-agent.ts";
-import { join, resolve } from "path";
+import { join } from "path";
+import { existsSync } from "fs";
 
 describe("SubAgent Path Traversal Security", () => {
   let workspace: SubAgentWorkspace;
@@ -51,13 +54,54 @@ describe("SubAgent Path Traversal Security", () => {
   });
 
   test("absolute path root escape via leading slash after prefix should be blocked", () => {
-    // This is the specific exploit mentioned in the issue:
-    // virtualPathToActual("/home/agent//etc/passwd", workspace)
-    // relativePath becomes "/etc/passwd"
-    // resolve(basePathActual, "/etc/passwd") returns "/etc/passwd"
     const exploitPath = "/home/agent//etc/passwd";
     expect(() => virtualPathToActual(exploitPath, workspace)).toThrow(
       /Forbidden request|Path traversal detected/,
     );
+  });
+});
+
+describe("SubAgent Workspace Management", () => {
+  test("createSubAgentWorkspace should create a valid directory", async () => {
+    const workspace = await createSubAgentWorkspace();
+    expect(workspace.virtualPath).toBe("/home/agent");
+    expect(workspace.actualPath).toContain("agents-sandbox-");
+    expect(existsSync(workspace.actualPath)).toBe(true);
+    await cleanupSubAgentWorkspace(workspace);
+  });
+
+  test("cleanupSubAgentWorkspace should remove the directory", async () => {
+    const workspace = await createSubAgentWorkspace();
+    const path = workspace.actualPath;
+    expect(existsSync(path)).toBe(true);
+    await cleanupSubAgentWorkspace(workspace);
+    expect(existsSync(path)).toBe(false);
+  });
+
+  test("actualPathToVirtual should convert actual paths back to virtual", async () => {
+    const workspace = await createSubAgentWorkspace();
+    const actual = join(workspace.actualPath, "test/file.md");
+    const virtual = actualPathToVirtual(actual, workspace);
+    expect(virtual).toBe("/home/agent/test/file.md");
+    await cleanupSubAgentWorkspace(workspace);
+  });
+});
+
+describe("SubAgent Class", () => {
+  test("buildSystemPrompt should include current date and virtual path", () => {
+    const subAgent = new SubAgent({
+      model: {} as any,
+      system: "Test system prompt",
+      tools: {},
+    });
+
+    // @ts-ignore - accessing private method for testing
+    const prompt = subAgent.buildSystemPrompt();
+    const today = new Date().toDateString();
+
+    expect(prompt).toContain("Test system prompt");
+    expect(prompt).toContain(`Current Date: ${today}`);
+    expect(prompt).toContain("Your working directory is: /home/agent");
+    expect(prompt).toContain("IMPORTANT: You can only read and write files within /home/agent.");
   });
 });
