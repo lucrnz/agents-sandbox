@@ -344,6 +344,27 @@ For detailed patterns and workarounds, see [`.llm/docs/BUN_TESTS_TIME_MOCKING_RE
 - DO NOT install jest
 - DO NOT use `jest.useFakeTimers()` - use `setSystemTime` from `bun:test` instead
 
+## Integration Testing
+
+For comprehensive integration testing patterns including WebSocket testing, database testing with Drizzle ORM, mocking strategies, and CI/CD configuration, see the [Bun Integration Testing Guide](./.llm/docs/BUN_INTEGRATION_TESTING_GUIDE.md).
+
+### Go Library FFI Integration Test
+
+The file `src/backend/go-lib-ffi.integration.test.ts` tests the actual `.dylib` library (not mocks) to verify real FFI behavior:
+
+```bash
+# Build the Go library first
+cd go-lib-ffi && make build && cd ..
+
+# Run integration tests
+bun test go-lib-ffi.integration.test.ts
+```
+
+**Key features:**
+- Uses `describe.skipIf(!libExists)` to gracefully skip when `.dylib` is not built
+- Tests all FFI functions: `cleanHTML`, `convertToMarkdown`, `parseSearchResults`, `stripMarkdown`, `getVersion`
+- Validates library loading and singleton pattern
+
 ## Go Library FFI (`go-lib-ffi/`)
 
 ### Overview
