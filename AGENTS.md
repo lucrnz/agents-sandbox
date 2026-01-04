@@ -4,15 +4,22 @@
 ## Documentation Structure
 ### Root Directory Markdown Files
 
-The root directory must contain **ONLY TWO** markdown files:
+The root directory contains these primary markdown files:
 
 1. **AGENTS.md** - This file. Main documentation for AI agents working in this codebase
 2. **README.md** - Human-readable project overview and user-facing documentation
+3. **CLAUDE.md** - Symbolic link for Claude Code
+4. **GEMINI.md** - Symbolic link for Antigravity and Gemini CLI
 
 ### CLAUDE.md
 **CLAUDE.md** is exclusively for the Claude Code CLI tool. It must always be a **symbolic link** to AGENTS.md, not a separate file:
 
 **Never** edit CLAUDE.md directly - it should always point to AGENTS.md so both human and AI agents see consistent documentation.
+
+### GEMINI.md
+**GEMINI.md** is for **Antigravity** and for the **Gemini CLI** tool. Like CLAUDE.md, it must always be a **symbolic link** to AGENTS.md, not a separate file:
+
+**Never** edit GEMINI.md directly - it should always point to AGENTS.md so both human and AI agents see consistent documentation.
 
 ### Documentation for Non-Humans
 
@@ -24,7 +31,7 @@ All documentation intended for AI agents (implementation guides, architecture de
 - `.llm/docs/ARCHITECTURE_DECISIONS.md` - Architecture rationale and decisions  
 - `.llm/docs/DEPLOYMENT_PROCEDURES.md` - Deployment and operational procedures
 
-**Keep the root clean** - Only AGENTS.md, README.md, and the CLAUDE.md symlink belong in the root directory.
+**Keep the root clean** - Only AGENTS.md, README.md, and the CLAUDE.md/GEMINI.md symlinks belong in the root directory.
 
 ## Implementation Plans
 IMPORTANT: If the user didn't ask for a plan, do not create it.
