@@ -101,7 +101,9 @@ export function virtualPathToActual(virtualPath: string, workspace: SubAgentWork
 
   // Final security check: Ensure the resolved path is still within the actual workspace
   // This blocks traversal attempts like "../../etc/passwd"
-  if (!resolvedPath.startsWith(basePathActual)) {
+  // Note: We check for basePathActual + "/" to prevent prefix collision attacks
+  // (e.g., basePathActual="/tmp/agent-1" should not allow "/tmp/agent-1-malicious")
+  if (!resolvedPath.startsWith(basePathActual + "/") && resolvedPath !== basePathActual) {
     throw new Error(`❌ Forbidden request: Path traversal detected`);
   }
 

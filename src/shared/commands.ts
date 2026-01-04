@@ -5,6 +5,9 @@ import { registry } from "./command-system";
 // Shared Schemas
 // ============================================================================
 
+export const ToolNameSchema = z.enum(["agentic_fetch"]);
+export type ToolName = z.infer<typeof ToolNameSchema>;
+
 const MessageSchema = z.object({
   id: z.number(),
   role: z.enum(["user", "assistant"]),
@@ -27,6 +30,7 @@ export const SendMessage = registry.command(
   z.object({
     content: z.string().min(1, "Message cannot be empty"),
     conversationId: z.string().optional(),
+    selectedTools: z.array(ToolNameSchema).optional(),
   }),
   z.object({
     messageId: z.number(),

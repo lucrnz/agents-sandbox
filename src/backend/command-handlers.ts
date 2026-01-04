@@ -54,7 +54,7 @@ export const commandHandlers = new CommandHandlerRegistry();
 // ============================================================================
 
 commandHandlers.register(SendMessage, async (payload, context) => {
-  const { content, conversationId: reqConvId } = payload;
+  const { content, conversationId: reqConvId, selectedTools } = payload;
   const { ws } = context;
 
   const targetConversationId = reqConvId || context.conversationId;
@@ -76,6 +76,7 @@ commandHandlers.register(SendMessage, async (payload, context) => {
   const orchestrator = new ChatOrchestrator({
     ws,
     conversationId: conversation.id,
+    selectedTools,
   });
 
   // Start processing in background (orchestrator handles its own fire-and-forget)

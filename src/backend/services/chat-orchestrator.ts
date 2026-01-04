@@ -8,6 +8,7 @@ import {
   AgentToolCompleteEvent,
   AgentToolErrorEvent,
   ChatAgentErrorEvent,
+  type ToolName,
 } from "@/shared/commands";
 import {
   addMessage,
@@ -23,16 +24,19 @@ import { BackgroundTaskTracker } from "./background-task-tracker";
 export type ChatOrchestratorContext = {
   ws: ServerWebSocket<{ conversationId?: string }>;
   conversationId: string;
+  selectedTools?: ToolName[];
 };
 
 export class ChatOrchestrator {
   private ws: ServerWebSocket<{ conversationId?: string }>;
   private conversationId: string;
+  private selectedTools?: ToolName[];
   private taskTracker: BackgroundTaskTracker;
 
   constructor(context: ChatOrchestratorContext) {
     this.ws = context.ws;
     this.conversationId = context.conversationId;
+    this.selectedTools = context.selectedTools;
     this.taskTracker = new BackgroundTaskTracker();
   }
 
@@ -108,6 +112,7 @@ export class ChatOrchestrator {
 
       // Create a new ChatAgent instance with callbacks for tool events
       const agent = new ChatAgent({
+        enabledTools: this.selectedTools,
         onToolCall: (toolName, args) => {
           if (toolName === "agentic_fetch") {
             const statusMessage = generateStatusMessage(args || null);

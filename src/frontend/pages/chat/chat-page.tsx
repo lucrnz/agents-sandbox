@@ -5,6 +5,7 @@ import { Textarea } from "@/frontend/components/ui/textarea";
 import { useWebSocket } from "@/frontend/hooks/useWebSocket";
 import ConversationSidebar from "@/frontend/components/conversation-sidebar";
 import { MarkdownRenderer } from "@/frontend/components/markdown-renderer";
+import { ToolSelector } from "@/frontend/components/tool-selector";
 import { useDevMode } from "@/frontend/contexts/dev-mode-context";
 import { toast } from "sonner";
 import {
@@ -29,6 +30,7 @@ import {
   type AgentToolErrorPayload,
   type ChatAgentErrorPayload,
   type BackgroundTaskErrorPayload,
+  type ToolName,
 } from "@/shared/commands";
 
 interface Message {
@@ -67,6 +69,7 @@ export default function ChatPage() {
   const [hasSelectedConversation, setHasSelectedConversation] = useState(false);
   const [lastFailedMessage, setLastFailedMessage] = useState<string>("");
   const [hasAgentError, setHasAgentError] = useState(false);
+  const [selectedTools, setSelectedTools] = useState<ToolName[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -351,6 +354,7 @@ export default function ChatPage() {
       const result = await send(SendMessage, {
         content: messageContent,
         conversationId: currentConversationId,
+        selectedTools,
       });
 
       // Update the user message with its actual ID from the database
@@ -671,6 +675,11 @@ export default function ChatPage() {
 
                 <div className="bg-card border-t p-3">
                   <div className="flex items-end gap-2">
+                    <ToolSelector
+                      selectedTools={selectedTools}
+                      onToolsChange={setSelectedTools}
+                      disabled={!isConnected || isLoading}
+                    />
                     <Textarea
                       ref={textareaRef}
                       value={inputMessage}

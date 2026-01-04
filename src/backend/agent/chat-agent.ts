@@ -1,6 +1,7 @@
 import { ToolLoopAgent, stepCountIs } from "ai";
 import { bigModel } from "./model-config.js";
 import { createAgenticFetchTool } from "./agentic-fetch.js";
+import type { ToolName } from "@/shared/commands";
 
 /**
  * Simple ChatAgent configuration with agentic fetch tool
@@ -14,6 +15,7 @@ export class ChatAgent {
   };
 
   constructor(params?: {
+    enabledTools?: ToolName[];
     onToolCall?: (toolName: string, args: any) => void;
     onToolResult?: (toolName: string, result: any, error?: Error) => void;
     onCriticalError?: (error: Error, originalError?: string) => void;
@@ -21,8 +23,15 @@ export class ChatAgent {
     // Store params for use in error handling
     this.params = params;
 
-    const agenticFetchTool = createAgenticFetchTool();
-    console.log("[CHAT_AGENT] Initializing with tools:", { agentic_fetch: !!agenticFetchTool });
+    // Build tools object based on enabledTools
+    const tools: Record<string, any> = {};
+
+    // Include agentic_fetch tool if enabledTools is undefined (backward compatibility) or explicitly enabled
+    if (!params?.enabledTools || params.enabledTools.includes("agentic_fetch")) {
+      tools.agentic_fetch = createAgenticFetchTool();
+    }
+
+    console.log("[CHAT_AGENT] Initializing with tools:", Object.keys(tools));
 
     this.agent = new ToolLoopAgent({
       model: bigModel,
@@ -35,12 +44,10 @@ Current Date: ${new Date().toDateString()}
 - Provide helpful, accurate information
 - When you don't know something, admit it honestly
 - Try to be concise but thorough in your responses
-- When you need current information from the web, use the agentic_fetch tool to search or fetch content`,
+${tools.agentic_fetch ? "- When you need current information from the web, use the agentic_fetch tool to search or fetch content" : ""}`,
 
-      // Tools object - now includes agentic_fetch
-      tools: {
-        agentic_fetch: agenticFetchTool,
-      },
+      // Tools object - conditionally includes agentic_fetch
+      tools,
 
       // Stop conditions - reasonable default
       stopWhen: stepCountIs(10),
