@@ -182,8 +182,23 @@ Read the [AI Agent System Documentation](.llm/docs/AI_AGENT_SYSTEM_DOCUMENTATION
 
 - **UI Components**: Use `class-variance-authority` (cva) for variants
 - **Styling**: Tailwind CSS with `tailwind-merge` and `clsx`
-- **Radix UI**: Headless components with custom styling
+- **Radix UI**: Headless components with custom styling. **DO NOT use Radix UI primitives directly**; always use the pre-built shadcn/ui components in `src/frontend/components/ui/`.
 - **Icons**: Lucide React icons
+
+### Adding shadcn Components
+
+To add a new shadcn component, use the `shadcn` CLI via `bunx`. The `--bun` flag is crucial to ensure it uses the Bun runtime.
+
+Browse the [available components catalog](https://ui.shadcn.com/docs/components) to find the correct component name.
+
+```bash
+bunx --bun shadcn@latest add [component-name]
+```
+
+Example:
+```bash
+bunx --bun shadcn@latest add accordion
+```
 
 ### Example Component (`button.tsx`)
 
@@ -439,6 +454,8 @@ make clean        # Remove build artifacts
 9. **Component variants** - Use cva for component variants, never duplicate class strings
 
 10. **CSS imports** - Import CSS directly in TSX files, Bun handles bundling
+
+11. **UI Components** - **NEVER** install or use Radix UI primitives directly (e.g., `@radix-ui/react-dialog`). **ALWAYS** use the corresponding shadcn/ui component (e.g., `src/frontend/components/ui/dialog.tsx`). If a component is missing, ask the user to add it.
 
 ## Debugging Tips
 ### Backend
