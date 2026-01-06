@@ -1,6 +1,6 @@
 import { ToolLoopAgent, stepCountIs } from "ai";
 import { bigModel } from "./model-config.js";
-import { createAgenticFetchTool } from "./agentic-fetch.js";
+import { createDeepResearchTool } from "./deep-research.js";
 import type { ToolName } from "@/shared/commands";
 
 /**
@@ -26,9 +26,9 @@ export class ChatAgent {
     // Build tools object based on enabledTools
     const tools: Record<string, any> = {};
 
-    // Include agentic_fetch tool if enabledTools is undefined (backward compatibility) or explicitly enabled
-    if (!params?.enabledTools || params.enabledTools.includes("agentic_fetch")) {
-      tools.agentic_fetch = createAgenticFetchTool();
+    // Include deep_research tool if enabledTools is undefined (backward compatibility) or explicitly enabled
+    if (!params?.enabledTools || params.enabledTools.includes("deep_research")) {
+      tools.deep_research = createDeepResearchTool();
     }
 
     console.log("[CHAT_AGENT] Initializing with tools:", Object.keys(tools));
@@ -44,9 +44,9 @@ Current Date: ${new Date().toDateString()}
 - Provide helpful, accurate information
 - When you don't know something, admit it honestly
 - Try to be concise but thorough in your responses
-${tools.agentic_fetch ? "- When you need current information from the web, use the agentic_fetch tool to search or fetch content" : ""}`,
+${tools.deep_research ? "- When you need current information from the web, use the deep_research tool to search or fetch content" : ""}`,
 
-      // Tools object - conditionally includes agentic_fetch
+      // Tools object - conditionally includes deep_research
       tools,
 
       // Stop conditions - reasonable default

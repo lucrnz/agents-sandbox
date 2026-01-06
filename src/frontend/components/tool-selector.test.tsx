@@ -24,7 +24,7 @@ describe("ToolSelector", () => {
 
   test("shows telescope icon with blue color when deep research is enabled", () => {
     const { container } = render(
-      <ToolSelector selectedTools={["agentic_fetch"]} onToolsChange={() => {}} />,
+      <ToolSelector selectedTools={["deep_research"]} onToolsChange={() => {}} />,
     );
     const button = container.querySelector("button");
     expect(button).toBeTruthy();
@@ -41,9 +41,9 @@ describe("ToolSelector", () => {
     const plusIcon = container1.querySelector("svg.lucide-plus");
     expect(plusIcon).toBeTruthy();
 
-    // Test with agentic_fetch selected - should show telescope with blue color
+    // Test with deep_research selected - should show telescope with blue color
     const { container: container2 } = render(
-      <ToolSelector selectedTools={["agentic_fetch"]} onToolsChange={() => {}} />,
+      <ToolSelector selectedTools={["deep_research"]} onToolsChange={() => {}} />,
     );
     const telescopeIcon = container2.querySelector("svg.lucide-telescope.text-blue-500");
     expect(telescopeIcon).toBeTruthy();

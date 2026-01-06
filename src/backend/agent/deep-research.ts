@@ -9,7 +9,7 @@ import { createGrepTool } from "./grep-tool";
 import { virtualPathToActual } from "./sub-agent";
 import { MAX_SUB_AGENT_STEPS } from "./config";
 
-export const AgenticFetchParamsSchema = z.object({
+export const DeepResearchParamsSchema = z.object({
   url: z
     .url()
     .optional()
@@ -19,7 +19,7 @@ export const AgenticFetchParamsSchema = z.object({
   prompt: z.string().describe("The prompt describing what information to find or extract"),
 });
 
-export type AgenticFetchParams = z.infer<typeof AgenticFetchParamsSchema>;
+export type DeepResearchParams = z.infer<typeof DeepResearchParamsSchema>;
 
 /**
  * Sub-agent system prompt for web research and content analysis
@@ -73,7 +73,7 @@ When answering, structure your response as:
 
 Be thorough but concise. Focus on providing actionable information that directly answers the user's question.`;
 
-export function createAgenticFetchTool() {
+export function createDeepResearchTool() {
   return tool({
     description: `Autonomous web research assistant that searches, fetches, and analyzes web content.
 
@@ -96,14 +96,14 @@ The sub-agent autonomously:
 - Analyzes large pages efficiently (saves to file, uses grep)
 - Synthesizes information from multiple sources
 - Provides structured response with sources`,
-    inputSchema: AgenticFetchParamsSchema,
-    execute: async ({ prompt, url }: AgenticFetchParams) => {
-      console.log("[AGENTIC_FETCH] *** SUB-AGENT START ***");
-      console.log("[AGENTIC_FETCH] Input:", { prompt, url });
+    inputSchema: DeepResearchParamsSchema,
+    execute: async ({ prompt, url }: DeepResearchParams) => {
+      console.log("[DEEP_RESEARCH] *** SUB-AGENT START ***");
+      console.log("[DEEP_RESEARCH] Input:", { prompt, url });
 
       // Determine execution mode for logging
       const mode = url ? "URL Analysis" : "Web Search";
-      console.log("[AGENTIC_FETCH] MODE:", mode);
+      console.log("[DEEP_RESEARCH] MODE:", mode);
 
       // Create tools that can access the workspace
       let currentWorkspace: any = null;
@@ -128,13 +128,13 @@ The sub-agent autonomously:
         },
         maxSteps: MAX_SUB_AGENT_STEPS,
         onToolCall: (toolName: string, args: any) => {
-          console.log(`[AGENTIC_FETCH] Sub-agent tool call: ${toolName}`, args);
+          console.log(`[DEEP_RESEARCH] Sub-agent tool call: ${toolName}`, args);
         },
         onToolResult: (toolName: string, result: any, error?: Error) => {
           if (error) {
-            console.error(`[AGENTIC_FETCH] Sub-agent tool error: ${toolName}`, error);
+            console.error(`[DEEP_RESEARCH] Sub-agent tool error: ${toolName}`, error);
           } else {
-            console.log(`[AGENTIC_FETCH] Sub-agent tool result: ${toolName}`);
+            console.log(`[DEEP_RESEARCH] Sub-agent tool result: ${toolName}`);
           }
         },
         onWorkspaceCreated: (workspace) => {
@@ -158,27 +158,27 @@ Use web_search to find relevant information, then use web_fetch to get content f
 
       try {
         // Execute sub-agent
-        console.log("[AGENTIC_FETCH] Executing sub-agent");
+        console.log("[DEEP_RESEARCH] Executing sub-agent");
         const result = await subAgent.execute(subAgentPrompt);
 
-        console.log("[AGENTIC_FETCH] Sub-agent completed");
-        console.log("[AGENTIC_FETCH] Result length:", result.length);
+        console.log("[DEEP_RESEARCH] Sub-agent completed");
+        console.log("[DEEP_RESEARCH] Result length:", result.length);
 
         return result;
       } catch (error) {
-        console.error("[AGENTIC_FETCH] Sub-agent failed:", error);
+        console.error("[DEEP_RESEARCH] Sub-agent failed:", error);
 
         const errorMessage = error instanceof Error ? error.message : "Unknown error";
         return `Web research failed: ${errorMessage}. Please try rephrasing your request or try again later.`;
       } finally {
-        console.log("[AGENTIC_FETCH] *** SUB-AGENT END ***");
+        console.log("[DEEP_RESEARCH] *** SUB-AGENT END ***");
       }
     },
   });
 }
 
 // Helper function to generate status messages for UI
-export function generateStatusMessage(params: AgenticFetchParams | null): string {
+export function generateStatusMessage(params: DeepResearchParams | null): string {
   if (!params) {
     return "Preparing search...";
   }

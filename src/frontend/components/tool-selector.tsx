@@ -18,7 +18,7 @@ interface ToolSelectorProps {
 }
 
 export function ToolSelector({ selectedTools, onToolsChange, disabled }: ToolSelectorProps) {
-  const isDeepResearchEnabled = selectedTools.includes("agentic_fetch");
+  const isDeepResearchEnabled = selectedTools.includes("deep_research");
 
   const handleToolToggle = (toolName: ToolName, checked: boolean) => {
     if (checked) {
@@ -50,7 +50,7 @@ export function ToolSelector({ selectedTools, onToolsChange, disabled }: ToolSel
         <DropdownMenuSeparator />
         <DropdownMenuCheckboxItem
           checked={isDeepResearchEnabled}
-          onCheckedChange={(checked) => handleToolToggle("agentic_fetch", checked)}
+          onCheckedChange={(checked) => handleToolToggle("deep_research", checked)}
         >
           <div className="flex items-center gap-2">
             <Telescope className="h-4 w-4" />

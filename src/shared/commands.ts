@@ -5,7 +5,7 @@ import { registry } from "./command-system";
 // Shared Schemas
 // ============================================================================
 
-export const ToolNameSchema = z.enum(["agentic_fetch"]);
+export const ToolNameSchema = z.enum(["deep_research"]);
 export type ToolName = z.infer<typeof ToolNameSchema>;
 
 const MessageSchema = z.object({

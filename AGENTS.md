@@ -69,7 +69,7 @@ bun run build.ts --outdir=dist --minify --sourcemap=linked --external=react,reac
 - **Bun.serve()** - Built-in HTTP/WebSocket server (no Express)
 - **Drizzle ORM** - SQLite database with `bun:sqlite`
 - **AI SDK** - xAI (Grok) + Mistral (3B) integration
-- **Agent Tools** - Built-in agentic fetch with web search capabilities
+- **Agent Tools** - Built-in deep research with web search capabilities
 
 ### Frontend Framework
 
@@ -239,7 +239,7 @@ HOST=localhost
 DEBUG=true
 ```
 
-When `DEBUG=true`, agentic fetch requests generate detailed markdown files in the `.debug/` directory containing search results, URL analysis data, and execution details for debugging purposes.
+When `DEBUG=true`, deep research requests generate detailed markdown files in the `.debug/` directory containing search results, URL analysis data, and execution details for debugging purposes.
 
 ## TypeScript Configuration
 

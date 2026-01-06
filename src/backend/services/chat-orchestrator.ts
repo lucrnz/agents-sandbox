@@ -17,7 +17,7 @@ import {
   getConversationWithMessages,
 } from "@/backend/db";
 import { ChatAgent } from "@/backend/agent/chat-agent";
-import { generateStatusMessage } from "@/backend/agent/agentic-fetch.js";
+import { generateStatusMessage } from "@/backend/agent/deep-research.js";
 import { generateConversationTitle } from "@/backend/agent/title-generation.js";
 import { BackgroundTaskTracker } from "./background-task-tracker";
 
@@ -114,7 +114,7 @@ export class ChatOrchestrator {
       const agent = new ChatAgent({
         enabledTools: this.selectedTools,
         onToolCall: (toolName, args) => {
-          if (toolName === "agentic_fetch") {
+          if (toolName === "deep_research") {
             const statusMessage = generateStatusMessage(args || null);
             this.emitEvent(AgentToolStartEvent.name, {
               conversationId: this.conversationId,
