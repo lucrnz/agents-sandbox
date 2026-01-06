@@ -88,14 +88,14 @@ export default function ConversationSidebar({
                 {groups.lastThirtyDays.map(renderConversation)}
               </div>
             )}
-            {groups.older.length > 0 && (
-              <div className="mb-6">
+            {groups.olderGroups.map((group) => (
+              <div key={group.title} className="mb-6">
                 <h3 className="text-muted-foreground mb-2 px-2 text-xs font-semibold tracking-wider uppercase">
-                  Older Chats
+                  {group.title}
                 </h3>
-                {groups.older.map(renderConversation)}
+                {group.conversations.map(renderConversation)}
               </div>
-            )}
+            ))}
           </>
         )}
       </div>

@@ -79,7 +79,14 @@ describe("ConversationSidebar component", () => {
     expect(getByText("Yesterday")).toBeInTheDocument();
     expect(getByText("Last 7 Days")).toBeInTheDocument();
     expect(getByText("Last 30 Days")).toBeInTheDocument();
-    expect(getByText("Older Chats")).toBeInTheDocument();
+
+    const olderYear = older.getFullYear();
+    const currentYear = today.getFullYear();
+    if (olderYear === currentYear) {
+      expect(getByText("This Year")).toBeInTheDocument();
+    } else {
+      expect(getByText(olderYear.toString())).toBeInTheDocument();
+    }
 
     // Check for items
     expect(getByText("Today Conversation")).toBeInTheDocument();

@@ -544,7 +544,9 @@ export default function ChatPage() {
                               {renderGroup("Yesterday", groups.yesterday)}
                               {renderGroup("Last 7 Days", groups.lastSevenDays)}
                               {renderGroup("Last 30 Days", groups.lastThirtyDays)}
-                              {renderGroup("Older Chats", groups.older)}
+                              {groups.olderGroups.map((group) =>
+                                renderGroup(group.title, group.conversations),
+                              )}
                             </>
                           );
                         })()}
