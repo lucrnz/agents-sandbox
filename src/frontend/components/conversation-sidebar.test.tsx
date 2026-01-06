@@ -6,21 +6,41 @@ import ConversationSidebar from "./conversation-sidebar";
 import type { Conversation } from "@/shared/commands";
 
 describe("ConversationSidebar component", () => {
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  const lastWeek = new Date(today);
+  lastWeek.setDate(today.getDate() - 5);
+  const lastMonth = new Date(today);
+  lastMonth.setDate(today.getDate() - 15);
+  const older = new Date(today);
+  older.setDate(today.getDate() - 60);
+
   const mockConversations: Conversation[] = [
     {
       id: "conv-1",
-      title: "First Conversation",
-      updatedAt: "2024-01-15T10:00:00Z",
+      title: "Today Conversation",
+      updatedAt: today.toISOString(),
     },
     {
       id: "conv-2",
-      title: "Second Conversation",
-      updatedAt: "2024-01-16T14:30:00Z",
+      title: "Yesterday Conversation",
+      updatedAt: yesterday.toISOString(),
     },
     {
       id: "conv-3",
-      title: "Third Conversation",
-      updatedAt: "2024-01-17T09:15:00Z",
+      title: "Last Week Conversation",
+      updatedAt: lastWeek.toISOString(),
+    },
+    {
+      id: "conv-4",
+      title: "Last Month Conversation",
+      updatedAt: lastMonth.toISOString(),
+    },
+    {
+      id: "conv-5",
+      title: "Older Conversation",
+      updatedAt: older.toISOString(),
     },
   ];
 
@@ -37,7 +57,6 @@ describe("ConversationSidebar component", () => {
     );
 
     expect(getByText("New Conversation")).toBeInTheDocument();
-    expect(getByText("Recent Conversations")).toBeInTheDocument();
     expect(getByText("No conversations yet")).toBeInTheDocument();
   });
 
@@ -54,10 +73,20 @@ describe("ConversationSidebar component", () => {
     );
 
     expect(getByText("New Conversation")).toBeInTheDocument();
-    expect(getByText("Recent Conversations")).toBeInTheDocument();
-    expect(getByText("First Conversation")).toBeInTheDocument();
-    expect(getByText("Second Conversation")).toBeInTheDocument();
-    expect(getByText("Third Conversation")).toBeInTheDocument();
+
+    // Check for headers
+    expect(getByText("Today")).toBeInTheDocument();
+    expect(getByText("Yesterday")).toBeInTheDocument();
+    expect(getByText("Last 7 Days")).toBeInTheDocument();
+    expect(getByText("Last 30 Days")).toBeInTheDocument();
+    expect(getByText("Older Chats")).toBeInTheDocument();
+
+    // Check for items
+    expect(getByText("Today Conversation")).toBeInTheDocument();
+    expect(getByText("Yesterday Conversation")).toBeInTheDocument();
+    expect(getByText("Last Week Conversation")).toBeInTheDocument();
+    expect(getByText("Last Month Conversation")).toBeInTheDocument();
+    expect(getByText("Older Conversation")).toBeInTheDocument();
   });
 
   test("calls onNewConversation when New Conversation button is clicked", async () => {
@@ -91,7 +120,7 @@ describe("ConversationSidebar component", () => {
       />,
     );
 
-    const firstConversation = getByText("First Conversation").closest("button");
+    const firstConversation = getByText("Today Conversation").closest("button");
     expect(firstConversation).toBeInTheDocument();
 
     if (firstConversation) {
@@ -114,7 +143,7 @@ describe("ConversationSidebar component", () => {
       />,
     );
 
-    const secondConversation = getByText("Second Conversation").closest("button");
+    const secondConversation = getByText("Yesterday Conversation").closest("button");
     expect(secondConversation).toBeInTheDocument();
     expect(secondConversation).toHaveClass("bg-primary/10");
   });
@@ -132,12 +161,12 @@ describe("ConversationSidebar component", () => {
     );
 
     // Check that dates are rendered (format may vary by locale, so we just check they exist)
-    const firstConversation = getByText("First Conversation").closest("button");
+    const firstConversation = getByText("Today Conversation").closest("button");
     expect(firstConversation).toBeInTheDocument();
     // The date should be rendered in the button
     const dateText = firstConversation?.textContent || "";
     // Should contain some date/time formatting
-    expect(dateText.length).toBeGreaterThan("First Conversation".length);
+    expect(dateText.length).toBeGreaterThan("Today Conversation".length);
   });
 
   test("handles multiple conversation clicks correctly", async () => {
@@ -152,8 +181,8 @@ describe("ConversationSidebar component", () => {
       />,
     );
 
-    const secondConversation = getByText("Second Conversation").closest("button");
-    const thirdConversation = getByText("Third Conversation").closest("button");
+    const secondConversation = getByText("Yesterday Conversation").closest("button");
+    const thirdConversation = getByText("Last Week Conversation").closest("button");
 
     if (secondConversation && thirdConversation) {
       await secondConversation.click();
@@ -177,7 +206,7 @@ describe("ConversationSidebar component", () => {
       />,
     );
 
-    const firstConversation = getByText("First Conversation").closest("button");
+    const firstConversation = getByText("Today Conversation").closest("button");
     expect(firstConversation).toBeInTheDocument();
     expect(firstConversation).not.toHaveClass("bg-primary/10");
   });

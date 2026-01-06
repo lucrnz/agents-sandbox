@@ -27,7 +27,9 @@ import {
   type ChatAgentErrorPayload,
   type BackgroundTaskErrorPayload,
   type ToolName,
+  type Conversation,
 } from "@/shared/commands";
+import { groupConversations } from "@/frontend/lib/date-utils";
 
 interface Message {
   id?: number;
@@ -44,12 +46,6 @@ interface Message {
     error: string;
     canRetry: boolean;
   };
-}
-
-interface Conversation {
-  id: string;
-  title: string;
-  updatedAt: string;
 }
 
 export default function ChatPage() {
@@ -512,24 +508,46 @@ export default function ChatPage() {
 
                   {conversations.length > 0 ? (
                     <div>
-                      <h3 className="text-muted-foreground mb-4 text-lg font-semibold">
-                        Recent conversations
-                      </h3>
-                      <div className="space-y-3">
-                        {conversations.map((conversation) => (
-                          <div
-                            key={conversation.id}
-                            onClick={() => handleLoadConversation(conversation.id)}
-                            className="bg-card border-border hover:bg-muted/50 cursor-pointer rounded-lg border p-4 transition-colors"
-                          >
-                            <h4 className="text-foreground truncate font-medium">
-                              {conversation.title}
-                            </h4>
-                            <p className="text-muted-foreground mt-1 text-sm">
-                              {new Date(conversation.updatedAt).toLocaleString()}
-                            </p>
-                          </div>
-                        ))}
+                      <div className="space-y-8">
+                        {(() => {
+                          const groups = groupConversations(conversations);
+                          const renderGroup = (title: string, items: Conversation[]) => {
+                            if (items.length === 0) return null;
+                            return (
+                              <div>
+                                <h3 className="text-muted-foreground mb-3 text-sm font-semibold tracking-wider uppercase">
+                                  {title}
+                                </h3>
+                                <div className="space-y-3">
+                                  {items.map((conversation) => (
+                                    <div
+                                      key={conversation.id}
+                                      onClick={() => handleLoadConversation(conversation.id)}
+                                      className="bg-card border-border hover:bg-muted/50 cursor-pointer rounded-lg border p-4 transition-colors"
+                                    >
+                                      <h4 className="text-foreground truncate font-medium">
+                                        {conversation.title}
+                                      </h4>
+                                      <p className="text-muted-foreground mt-1 text-sm">
+                                        {new Date(conversation.updatedAt).toLocaleString()}
+                                      </p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          };
+
+                          return (
+                            <>
+                              {renderGroup("Today", groups.today)}
+                              {renderGroup("Yesterday", groups.yesterday)}
+                              {renderGroup("Last 7 Days", groups.lastSevenDays)}
+                              {renderGroup("Last 30 Days", groups.lastThirtyDays)}
+                              {renderGroup("Older Chats", groups.older)}
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
                   ) : (
