@@ -28,7 +28,10 @@ export class ChatAgent {
 
     // Include deep_research tool if enabledTools is undefined (backward compatibility) or explicitly enabled
     if (!params?.enabledTools || params.enabledTools.includes("deep_research")) {
-      tools.deep_research = createDeepResearchTool();
+      tools.deep_research = createDeepResearchTool({
+        onSubAgentToolCall: params?.onToolCall,
+        onSubAgentToolResult: params?.onToolResult,
+      });
     }
 
     console.log("[CHAT_AGENT] Initializing with tools:", Object.keys(tools));

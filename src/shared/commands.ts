@@ -103,32 +103,11 @@ export const SystemNotificationEvent = registry.event(
 // Agent Tool Events (for future tool integration)
 // ============================================================================
 
-export const AgentToolStartEvent = registry.event(
-  "agent_tool_start",
+export const AgentStatusUpdateEvent = registry.event(
+  "agent_status_update",
   z.object({
     conversationId: z.string(),
-    toolName: z.string(),
-    description: z.string().optional(),
-    timestamp: z.string().datetime(),
-  }),
-);
-
-export const AgentToolCompleteEvent = registry.event(
-  "agent_tool_complete",
-  z.object({
-    conversationId: z.string(),
-    toolName: z.string(),
-    result: z.any().optional(),
-    timestamp: z.string().datetime(),
-  }),
-);
-
-export const AgentToolErrorEvent = registry.event(
-  "agent_tool_error",
-  z.object({
-    conversationId: z.string(),
-    toolName: z.string(),
-    error: z.string(),
+    status: z.string(),
     timestamp: z.string().datetime(),
   }),
 );
@@ -175,8 +154,6 @@ export type AIResponseChunkPayload = z.infer<typeof AIResponseChunkEvent.payload
 export type ConversationUpdatedPayload = z.infer<typeof ConversationUpdatedEvent.payloadSchema>;
 export type SystemNotificationPayload = z.infer<typeof SystemNotificationEvent.payloadSchema>;
 
-export type AgentToolStartPayload = z.infer<typeof AgentToolStartEvent.payloadSchema>;
-export type AgentToolCompletePayload = z.infer<typeof AgentToolCompleteEvent.payloadSchema>;
-export type AgentToolErrorPayload = z.infer<typeof AgentToolErrorEvent.payloadSchema>;
+export type AgentStatusUpdatePayload = z.infer<typeof AgentStatusUpdateEvent.payloadSchema>;
 export type ChatAgentErrorPayload = z.infer<typeof ChatAgentErrorEvent.payloadSchema>;
 export type BackgroundTaskErrorPayload = z.infer<typeof BackgroundTaskErrorEvent.payloadSchema>;

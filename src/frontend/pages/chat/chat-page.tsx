@@ -16,18 +16,14 @@ import {
   AIResponseChunkEvent,
   ConversationUpdatedEvent,
   SystemNotificationEvent,
-  AgentToolStartEvent,
-  AgentToolCompleteEvent,
-  AgentToolErrorEvent,
+  AgentStatusUpdateEvent,
   ChatAgentErrorEvent,
   BackgroundTaskErrorEvent,
   type AIResponsePayload,
   type AIResponseChunkPayload,
   type ConversationUpdatedPayload,
   type SystemNotificationPayload,
-  type AgentToolStartPayload,
-  type AgentToolCompletePayload,
-  type AgentToolErrorPayload,
+  type AgentStatusUpdatePayload,
   type ChatAgentErrorPayload,
   type BackgroundTaskErrorPayload,
   type ToolName,
@@ -60,9 +56,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [loadingStatus, setLoadingStatus] = useState<"Thinking..." | "Generating...">(
-    "Thinking...",
-  );
+  const [loadingStatus, setLoadingStatus] = useState<string>("Thinking...");
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<string>();
   const [currentConversationTitle, setCurrentConversationTitle] = useState("New Chat");
@@ -177,62 +171,16 @@ export default function ChatPage() {
       },
     );
 
-    // Agent tool event handlers (for future use)
-    const unsubAgentToolStart = on<AgentToolStartPayload>(AgentToolStartEvent, (payload) => {
-      if (payload.conversationId === currentConversationId) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            sender: "system",
-            text: `🔧 Using tool: ${payload.toolName}${payload.description ? ` - ${payload.description}` : ""}`,
-            timestamp: payload.timestamp,
-            toolInfo: {
-              toolName: payload.toolName,
-              status: "start",
-              description: payload.description,
-            },
-          },
-        ]);
-      }
-    });
-
-    const unsubAgentToolComplete = on<AgentToolCompletePayload>(
-      AgentToolCompleteEvent,
+    // Agent status updates (real-time feedback)
+    const unsubAgentStatusUpdate = on<AgentStatusUpdatePayload>(
+      AgentStatusUpdateEvent,
       (payload) => {
         if (payload.conversationId === currentConversationId) {
-          setMessages((prev) => [
-            ...prev,
-            {
-              sender: "system",
-              text: `✅ Completed: ${payload.toolName}`,
-              timestamp: payload.timestamp,
-              toolInfo: {
-                toolName: payload.toolName,
-                status: "complete",
-              },
-            },
-          ]);
+          setLoadingStatus(payload.status);
+          setIsLoading(true);
         }
       },
     );
-
-    const unsubAgentToolError = on<AgentToolErrorPayload>(AgentToolErrorEvent, (payload) => {
-      if (payload.conversationId === currentConversationId) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            sender: "system",
-            text: `❌ Error in ${payload.toolName}: ${payload.error}`,
-            timestamp: payload.timestamp,
-            toolInfo: {
-              toolName: payload.toolName,
-              status: "error",
-              error: payload.error,
-            },
-          },
-        ]);
-      }
-    });
 
     const unsubChatAgentError = on<ChatAgentErrorPayload>(ChatAgentErrorEvent, (payload) => {
       if (payload.conversationId === currentConversationId) {
@@ -271,9 +219,7 @@ export default function ChatPage() {
       unsubAIResponseChunk();
       unsubConversationUpdated();
       unsubSystemNotification();
-      unsubAgentToolStart();
-      unsubAgentToolComplete();
-      unsubAgentToolError();
+      unsubAgentStatusUpdate();
       unsubChatAgentError();
       unsubBackgroundTaskError();
     };

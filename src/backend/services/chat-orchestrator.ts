@@ -4,9 +4,7 @@ import {
   AIResponseEvent,
   AIResponseChunkEvent,
   ConversationUpdatedEvent,
-  AgentToolStartEvent,
-  AgentToolCompleteEvent,
-  AgentToolErrorEvent,
+  AgentStatusUpdateEvent,
   ChatAgentErrorEvent,
   type ToolName,
 } from "@/shared/commands";
@@ -114,32 +112,31 @@ export class ChatOrchestrator {
       const agent = new ChatAgent({
         enabledTools: this.selectedTools,
         onToolCall: (toolName, args) => {
+          let statusMessage = "";
+
+          // Generate friendly status messages for known tools
           if (toolName === "deep_research") {
-            const statusMessage = generateStatusMessage(args || null);
-            this.emitEvent(AgentToolStartEvent.name, {
-              conversationId: this.conversationId,
-              toolName,
-              description: statusMessage,
-              timestamp: new Date().toISOString(),
-            });
+            statusMessage = generateStatusMessage(args || null);
+          } else if (toolName === "web_search") {
+            statusMessage = args?.query ? `Searching for: "${args.query}"` : "Searching web...";
+          } else if (toolName === "web_fetch") {
+            statusMessage = args?.url ? `Fetching: ${args.url}` : "Fetching url...";
+          } else if (toolName === "view") {
+            statusMessage = args?.path ? `Reading file: ${args.path}` : "Reading file...";
+          } else if (toolName === "grep") {
+            statusMessage = args?.pattern
+              ? `Searching for "${args.pattern}" in file...`
+              : "Searching in file...";
           }
+
+          this.emitEvent(AgentStatusUpdateEvent.name, {
+            conversationId: this.conversationId,
+            status: statusMessage,
+            timestamp: new Date().toISOString(),
+          });
         },
         onToolResult: (toolName, result, error) => {
-          if (error) {
-            this.emitEvent(AgentToolErrorEvent.name, {
-              conversationId: this.conversationId,
-              toolName,
-              error: error.message,
-              timestamp: new Date().toISOString(),
-            });
-          } else {
-            this.emitEvent(AgentToolCompleteEvent.name, {
-              conversationId: this.conversationId,
-              toolName,
-              result,
-              timestamp: new Date().toISOString(),
-            });
-          }
+          // We don't report tool results to the user as per requirements
         },
         onCriticalError: (error, originalError) => {
           const errorId = crypto.randomUUID();

@@ -73,7 +73,12 @@ When answering, structure your response as:
 
 Be thorough but concise. Focus on providing actionable information that directly answers the user's question.`;
 
-export function createDeepResearchTool() {
+export type DeepResearchOptions = {
+  onSubAgentToolCall?: (toolName: string, args: any) => void;
+  onSubAgentToolResult?: (toolName: string, result: any, error?: Error) => void;
+};
+
+export function createDeepResearchTool(options?: DeepResearchOptions) {
   return tool({
     description: `Autonomous web research assistant that searches, fetches, and analyzes web content.
 
@@ -85,7 +90,7 @@ Use this tool when you need:
 - Extract key information from web content
 
 Input:
-- prompt: What information to find or extract (required)
+- prompt: What information to find or extract (required)ß
 - url: Specific URL to analyze (optional)
 
 Returns: Comprehensive analysis with structured answer, key points, and sources.
@@ -129,12 +134,18 @@ The sub-agent autonomously:
         maxSteps: MAX_SUB_AGENT_STEPS,
         onToolCall: (toolName: string, args: any) => {
           console.log(`[DEEP_RESEARCH] Sub-agent tool call: ${toolName}`, args);
+          if (options?.onSubAgentToolCall) {
+            options.onSubAgentToolCall(toolName, args);
+          }
         },
         onToolResult: (toolName: string, result: any, error?: Error) => {
           if (error) {
             console.error(`[DEEP_RESEARCH] Sub-agent tool error: ${toolName}`, error);
           } else {
             console.log(`[DEEP_RESEARCH] Sub-agent tool result: ${toolName}`);
+          }
+          if (options?.onSubAgentToolResult) {
+            options.onSubAgentToolResult(toolName, result, error);
           }
         },
         onWorkspaceCreated: (workspace) => {
