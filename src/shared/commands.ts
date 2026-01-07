@@ -59,6 +59,17 @@ export const GetConversations = registry.command(
   }),
 );
 
+export const SuggestAnswer = registry.command(
+  "suggest_answer",
+  z.object({
+    conversationId: z.string().min(1, "Conversation ID is required"),
+    instructions: z.string().min(1, "Instructions cannot be empty"),
+  }),
+  z.object({
+    suggestedAnswer: z.string(),
+  }),
+);
+
 // ============================================================================
 // Events (Server → Client notifications)
 // ============================================================================
@@ -133,6 +144,15 @@ export const BackgroundTaskErrorEvent = registry.event(
   }),
 );
 
+export const SuggestAnswerChunkEvent = registry.event(
+  "suggest_answer_chunk",
+  z.object({
+    conversationId: z.string(),
+    delta: z.string(),
+    timestamp: z.string().datetime(),
+  }),
+);
+
 // ============================================================================
 // Type Exports
 // ============================================================================
@@ -157,3 +177,4 @@ export type SystemNotificationPayload = z.infer<typeof SystemNotificationEvent.p
 export type AgentStatusUpdatePayload = z.infer<typeof AgentStatusUpdateEvent.payloadSchema>;
 export type ChatAgentErrorPayload = z.infer<typeof ChatAgentErrorEvent.payloadSchema>;
 export type BackgroundTaskErrorPayload = z.infer<typeof BackgroundTaskErrorEvent.payloadSchema>;
+export type SuggestAnswerChunkPayload = z.infer<typeof SuggestAnswerChunkEvent.payloadSchema>;

@@ -1,51 +1,60 @@
 import { getGoLibFFI, type SearchResult } from "@/backend/go-lib-ffi";
-import { BROWSER_USER_AGENT, DEFAULT_SEARCH_RESULTS_COUNT } from "./config";
+import { BROWSER_USER_AGENT, DEFAULT_SEARCH_RESULTS_COUNT, FETCH_TIMEOUT_MS } from "./config";
 
 export type { SearchResult };
 
 export async function fetchUrlAndConvert(url: string): Promise<string> {
   console.log("[WEB_TOOLS] Fetching URL:", url);
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent": BROWSER_USER_AGENT,
-      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      "Accept-Language": "en-US,en;q=0.5",
-    },
-  });
 
-  console.log("[WEB_TOOLS] Response status:", response.status, response.statusText);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch URL: ${response.status} ${response.statusText}`);
-  }
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": BROWSER_USER_AGENT,
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+      },
+      signal: controller.signal,
+    });
 
-  const contentType = response.headers.get("content-type") || "";
-  console.log("[WEB_TOOLS] Content type:", contentType);
-  let content = await response.text();
+    console.log("[WEB_TOOLS] Response status:", response.status, response.statusText);
 
-  console.log("[WEB_TOOLS] Raw content length:", content.length);
-
-  // Convert HTML to Markdown
-  if (contentType.includes("text/html")) {
-    console.log("[WEB_TOOLS] Processing HTML content");
-    const cleanedHtml = removeNoisyElements(content);
-    content = convertHtmlToMarkdown(cleanedHtml);
-    console.log("[WEB_TOOLS] Processed markdown length:", content.length);
-  }
-  // Format JSON
-  else if (contentType.includes("application/json") || contentType.includes("text/json")) {
-    console.log("[WEB_TOOLS] Processing JSON content");
-    try {
-      const parsed = JSON.parse(content);
-      content = JSON.stringify(parsed, null, 2);
-      console.log("[WEB_TOOLS] Formatted JSON length:", content.length);
-    } catch {
-      console.log("[WEB_TOOLS] JSON parsing failed, keeping original");
-      // Keep original if parsing fails
+    if (!response.ok) {
+      throw new Error(`Failed to fetch URL: ${response.status} ${response.statusText}`);
     }
-  }
 
-  return content;
+    const contentType = response.headers.get("content-type") || "";
+    console.log("[WEB_TOOLS] Content type:", contentType);
+    let content = await response.text();
+
+    console.log("[WEB_TOOLS] Raw content length:", content.length);
+
+    // Convert HTML to Markdown
+    if (contentType.includes("text/html")) {
+      console.log("[WEB_TOOLS] Processing HTML content");
+      const cleanedHtml = removeNoisyElements(content);
+      content = convertHtmlToMarkdown(cleanedHtml);
+      console.log("[WEB_TOOLS] Processed markdown length:", content.length);
+    }
+    // Format JSON
+    else if (contentType.includes("application/json") || contentType.includes("text/json")) {
+      console.log("[WEB_TOOLS] Processing JSON content");
+      try {
+        const parsed = JSON.parse(content);
+        content = JSON.stringify(parsed, null, 2);
+        console.log("[WEB_TOOLS] Formatted JSON length:", content.length);
+      } catch {
+        console.log("[WEB_TOOLS] JSON parsing failed, keeping original");
+        // Keep original if parsing fails
+      }
+    }
+
+    return content;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 function removeNoisyElements(html: string): string {
@@ -94,32 +103,40 @@ export async function searchDuckDuckGo(
     kl: "",
   });
 
-  const response = await fetch("https://html.duckduckgo.com/html", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      "User-Agent": BROWSER_USER_AGENT,
-      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      "Accept-Language": "en-US,en;q=0.5",
-      "Accept-Encoding": "gzip, deflate",
-      Referer: "https://duckduckgo.com/",
-    },
-    body: formData.toString(),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
-  console.log("[WEB_TOOLS] Search response status:", response.status);
+  try {
+    const response = await fetch("https://html.duckduckgo.com/html", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": BROWSER_USER_AGENT,
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+        "Accept-Encoding": "gzip, deflate",
+        Referer: "https://duckduckgo.com/",
+      },
+      body: formData.toString(),
+      signal: controller.signal,
+    });
 
-  if (!response.ok && response.status !== 202) {
-    throw new Error(
-      `Search failed with status: ${response.status} (DuckDuckGo may be rate limiting)`,
-    );
+    console.log("[WEB_TOOLS] Search response status:", response.status);
+
+    if (!response.ok && response.status !== 202) {
+      throw new Error(
+        `Search failed with status: ${response.status} (DuckDuckGo may be rate limiting)`,
+      );
+    }
+
+    const html = await response.text();
+    console.log("[WEB_TOOLS] Raw search HTML length:", html.length);
+    const results = parseSearchResults(html, maxResults);
+    console.log("[WEB_TOOLS] Parsed", results.length, "search results");
+    return results;
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  const html = await response.text();
-  console.log("[WEB_TOOLS] Raw search HTML length:", html.length);
-  const results = parseSearchResults(html, maxResults);
-  console.log("[WEB_TOOLS] Parsed", results.length, "search results");
-  return results;
 }
 
 function parseSearchResults(html: string, maxResults: number): SearchResult[] {

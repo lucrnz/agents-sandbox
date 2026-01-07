@@ -26,3 +26,25 @@ export const DEFAULT_SEARCH_RESULTS_COUNT = 10;
  */
 export const BROWSER_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
+/**
+ * Timeout for HTTP fetch requests in milliseconds.
+ * Prevents hanging requests from blocking agent execution.
+ */
+export const FETCH_TIMEOUT_MS = 30_000; // 30 seconds
+
+/**
+ * Maximum retries for AI model calls.
+ */
+export const AI_MAX_RETRIES = 2;
+
+/**
+ * Maximum retries for non-critical AI calls (title inference, etc.).
+ */
+export const AI_MAX_RETRIES_LOW_PRIORITY = 1;
+
+/**
+ * Default title prefix for new conversations.
+ * Used for checking if a conversation needs title generation.
+ */
+export const DEFAULT_CONVERSATION_TITLE_PREFIX = "New chat";

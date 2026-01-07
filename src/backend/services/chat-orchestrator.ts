@@ -17,6 +17,7 @@ import {
 import { ChatAgent } from "@/backend/agent/chat-agent";
 import { generateStatusMessage } from "@/backend/agent/deep-research.js";
 import { generateConversationTitle } from "@/backend/agent/title-generation.js";
+import { DEFAULT_CONVERSATION_TITLE_PREFIX } from "@/backend/agent/config.js";
 import { BackgroundTaskTracker } from "./background-task-tracker";
 
 export type ChatOrchestratorContext = {
@@ -70,7 +71,9 @@ export class ChatOrchestrator {
 
     const messageCount = conversationWithMessages.messages.length;
     // Check if it's a default title - this is more reliable than just message count
-    const isDefaultTitle = conversationWithMessages.title.startsWith("New chat");
+    const isDefaultTitle = conversationWithMessages.title.startsWith(
+      DEFAULT_CONVERSATION_TITLE_PREFIX,
+    );
 
     // If it's a default title and we have 1 or 2 messages (user + optional thinking message)
     if (isDefaultTitle && messageCount >= 1 && messageCount <= 2) {

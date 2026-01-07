@@ -2,6 +2,7 @@ import { generateText, Output } from "ai";
 import { smallModel } from "./model-config.js";
 import z from "zod";
 import { getGoLibFFI } from "@/backend/go-lib-ffi.js";
+import { AI_MAX_RETRIES, AI_MAX_RETRIES_LOW_PRIORITY } from "./config.js";
 
 /**
  * Generate conversation title using small model
@@ -36,7 +37,7 @@ export async function generateConversationTitle(content: string): Promise<string
       - No markdown formatting
       Conversation:
       ${content}`,
-      maxRetries: 2,
+      maxRetries: AI_MAX_RETRIES,
     });
 
     const cleanedTitle = goLib.stripMarkdown(rawTitleResult);
@@ -68,7 +69,7 @@ URL: ${url}
 Return only the title, no explanation or additional text.
 
 Title:`,
-      maxRetries: 1,
+      maxRetries: AI_MAX_RETRIES_LOW_PRIORITY,
     });
 
     const rawTitleNoQuotes = text.trim().replace(/["']+/g, "");
@@ -107,7 +108,7 @@ export async function extractSearchKeywords(query: string): Promise<string[]> {
       Query: ${query}
       
       Keywords:`,
-      maxRetries: 1,
+      maxRetries: AI_MAX_RETRIES_LOW_PRIORITY,
     });
 
     const keywords = goLib
@@ -199,7 +200,7 @@ Requirements:
 - Use common words that capture the essence
 
 Short description:`,
-      maxRetries: 1,
+      maxRetries: AI_MAX_RETRIES_LOW_PRIORITY,
     });
 
     // Clean up the text to be filename-safe

@@ -21,7 +21,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
           h2: ({ children }) => <h2 className="mt-6 mb-3 text-xl font-semibold">{children}</h2>,
           h3: ({ children }) => <h3 className="mt-4 mb-2 text-lg font-medium">{children}</h3>,
           p: ({ children }) => <p className="mb-4 last:mb-0">{children}</p>,
-          code: ({ className, children, node, ...props }) => (
+          code: ({ className, children, ...props }) => (
             <code
               className={cn(
                 "custom-scrollbar block w-full overflow-x-auto rounded bg-gray-100 p-2 font-mono text-sm dark:bg-neutral-800",

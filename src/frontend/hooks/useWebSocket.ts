@@ -274,6 +274,15 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
       }
+      // Clear pending commands to prevent memory leaks and stale callbacks
+      pendingCommands.current.forEach((cmd) => {
+        cmd.reject(new Error("WebSocket connection closed"));
+      });
+      pendingCommands.current.clear();
+      // Close WebSocket connection if open
+      if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+        ws.current.close();
+      }
     };
   }, [url]);
 

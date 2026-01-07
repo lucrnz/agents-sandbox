@@ -1,13 +1,18 @@
 import type { ServerWebSocket } from "bun";
 import { registry, type CommandDef } from "@/shared/command-system";
-import { SendMessage, LoadConversation, GetConversations } from "@/shared/commands";
+import { SendMessage, LoadConversation, GetConversations, SuggestAnswer } from "@/shared/commands";
 import {
   getOrCreateConversation,
   getConversationWithMessages,
   getConversationsWithMessages,
   addMessage,
+  getMessages,
 } from "@/backend/db";
 import { ChatOrchestrator } from "@/backend/services/chat-orchestrator";
+import { bigModel } from "@/backend/agent/model-config";
+import { streamText } from "ai";
+import { createEventMessage } from "@/shared/command-system";
+import { SuggestAnswerChunkEvent } from "@/shared/commands";
 
 // ============================================================================
 // Command Handler Type
@@ -127,4 +132,66 @@ commandHandlers.register(GetConversations, async () => {
       updatedAt: c?.updatedAt?.toISOString(),
     })),
   };
+});
+
+commandHandlers.register(SuggestAnswer, async (payload, context) => {
+  const { conversationId, instructions } = payload;
+  const { ws } = context;
+
+  // Fetch conversation history
+  const messages = await getMessages(conversationId);
+
+  if (messages.length === 0) {
+    throw new Error("Cannot suggest answer for empty conversation");
+  }
+
+  // Format messages for the AI
+  const formattedHistory = messages.map((msg) => ({
+    role: msg.role as "user" | "assistant",
+    content: msg.content,
+  }));
+
+  // Construct the meta-prompt
+  const systemPrompt = `You are to suggest a response for the user to send.
+The user has provided these instructions for how you should respond: ${instructions}
+
+Based on the conversation history and the last message from the assistant,
+suggest a response that the user could send. The response should follow the user's instructions.
+
+IMPORTANT: Only provide the suggested response text, nothing else.
+Do not include any explanations, meta-commentary, or additional text.
+Just the suggested message itself.`;
+
+  const aiMessages = [{ role: "system" as const, content: systemPrompt }, ...formattedHistory];
+
+  let fullResponse = "";
+
+  try {
+    // Stream the response
+    const result = streamText({
+      model: bigModel,
+      messages: aiMessages,
+      temperature: 0.7,
+    });
+
+    // Consume the stream and send chunks
+    for await (const chunk of result.textStream) {
+      fullResponse += chunk;
+
+      // Emit chunk to client
+      const event = createEventMessage(SuggestAnswerChunkEvent.name, {
+        conversationId,
+        delta: chunk,
+        timestamp: new Date().toISOString(),
+      });
+      ws.send(JSON.stringify(event));
+    }
+
+    return {
+      suggestedAnswer: fullResponse,
+    };
+  } catch (error) {
+    console.error("[SUGGEST_ANSWER] Error generating suggestion:", error);
+    throw new Error("Failed to generate suggested answer");
+  }
 });

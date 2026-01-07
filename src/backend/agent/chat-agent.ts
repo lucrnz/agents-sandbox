@@ -101,7 +101,8 @@ ${tools.deep_research ? "- When you need current information from the web, use t
         yield chunk;
       }
     } catch (error) {
-      console.error("[CHAT_AGENT] Error generating response:", error);
+      const errorId = crypto.randomUUID();
+      console.error(`[CHAT_AGENT] Error ${errorId}:`, error);
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       const originalError = error instanceof Error ? error.stack : String(error);
 
@@ -113,8 +114,8 @@ ${tools.deep_research ? "- When you need current information from the web, use t
         );
       }
 
-      // Still yield a friendly error message to the stream
-      yield "❌ Sorry, I encountered an error while generating a response. Please try again.";
+      // Still yield a friendly error message to the stream with reference ID
+      yield `❌ Sorry, I encountered an error while generating a response. (Ref: ${errorId.slice(0, 8)})`;
     }
   }
 
@@ -128,7 +129,8 @@ ${tools.deep_research ? "- When you need current information from the web, use t
       const result = await this.agent.generate({ prompt });
       return result.text;
     } catch (error) {
-      console.error("Error generating response:", error);
+      const errorId = crypto.randomUUID();
+      console.error(`[CHAT_AGENT] Error ${errorId}:`, error);
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       const originalError = error instanceof Error ? error.stack : String(error);
 
@@ -140,7 +142,7 @@ ${tools.deep_research ? "- When you need current information from the web, use t
         );
       }
 
-      return "❌ Sorry, I encountered an error while generating a response. Please try again.";
+      return `❌ Sorry, I encountered an error while generating a response. (Ref: ${errorId.slice(0, 8)})`;
     }
   }
 }

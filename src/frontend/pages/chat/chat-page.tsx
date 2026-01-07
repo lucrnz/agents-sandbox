@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/frontend/components/ui/button";
-import { ArrowUp } from "lucide-react";
+import { ArrowUp, Zap, Square } from "lucide-react";
 import { Textarea } from "@/frontend/components/ui/textarea";
 import { useWebSocket } from "@/frontend/hooks/useWebSocket";
 import ConversationSidebar from "@/frontend/components/conversation-sidebar";
@@ -12,6 +12,7 @@ import {
   SendMessage,
   LoadConversation,
   GetConversations,
+  SuggestAnswer,
   AIResponseEvent,
   AIResponseChunkEvent,
   ConversationUpdatedEvent,
@@ -19,6 +20,7 @@ import {
   AgentStatusUpdateEvent,
   ChatAgentErrorEvent,
   BackgroundTaskErrorEvent,
+  SuggestAnswerChunkEvent,
   type AIResponsePayload,
   type AIResponseChunkPayload,
   type ConversationUpdatedPayload,
@@ -26,10 +28,19 @@ import {
   type AgentStatusUpdatePayload,
   type ChatAgentErrorPayload,
   type BackgroundTaskErrorPayload,
+  type SuggestAnswerChunkPayload,
   type ToolName,
   type Conversation,
 } from "@/shared/commands";
 import { groupConversations } from "@/frontend/lib/date-utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/frontend/components/ui/dialog";
 
 interface Message {
   id?: number;
@@ -60,6 +71,16 @@ export default function ChatPage() {
   const [lastFailedMessage, setLastFailedMessage] = useState<string>("");
   const [hasAgentError, setHasAgentError] = useState(false);
   const [selectedTools, setSelectedTools] = useState<ToolName[]>([]);
+
+  // Auto-answer state
+  const [isAutoAnswerMode, setIsAutoAnswerMode] = useState(false);
+  const [autoAnswerInstructions, setAutoAnswerInstructions] = useState("");
+  const [isGeneratingSuggestion, setIsGeneratingSuggestion] = useState(false);
+  const [isInstructionsDialogOpen, setIsInstructionsDialogOpen] = useState(false);
+  const [instructionsInput, setInstructionsInput] = useState("");
+  const autoAnswerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isStartingAutoAnswerRef = useRef(false);
+  const isGeneratingSuggestionRef = useRef(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -210,6 +231,20 @@ export default function ChatPage() {
       },
     );
 
+    const unsubSuggestAnswerChunk = on<SuggestAnswerChunkPayload>(
+      SuggestAnswerChunkEvent,
+      (payload) => {
+        // Only stream chunks if we're in auto-answer mode and generating
+        if (
+          payload.conversationId === currentConversationId &&
+          isAutoAnswerMode &&
+          isGeneratingSuggestion
+        ) {
+          setInputMessage((prev) => prev + payload.delta);
+        }
+      },
+    );
+
     return () => {
       unsubAIResponse();
       unsubAIResponseChunk();
@@ -218,8 +253,9 @@ export default function ChatPage() {
       unsubAgentStatusUpdate();
       unsubChatAgentError();
       unsubBackgroundTaskError();
+      unsubSuggestAnswerChunk();
     };
-  }, [on, currentConversationId]);
+  }, [on, currentConversationId, isAutoAnswerMode, isGeneratingSuggestion]);
 
   // ============================================================================
   // Load conversations on connect
@@ -232,12 +268,24 @@ export default function ChatPage() {
   }, [isConnected]);
 
   // ============================================================================
-  // Auto-scroll
+  // Auto-scroll (throttled during streaming)
   // ============================================================================
 
+  const lastScrollTimeRef = useRef<number>(0);
+  const scrollThrottleMs = 250;
+
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    const now = Date.now();
+    const timeSinceLastScroll = now - lastScrollTimeRef.current;
+
+    // Scroll immediately if:
+    // 1. Response finished generating (isLoading just became false)
+    // 2. Enough time has passed since last scroll (throttle during streaming)
+    if (!isLoading || timeSinceLastScroll >= scrollThrottleMs) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      lastScrollTimeRef.current = now;
+    }
+  }, [messages, isLoading]);
 
   // ============================================================================
   // Auto-resize textarea
@@ -264,83 +312,91 @@ export default function ChatPage() {
   // Actions
   // ============================================================================
 
-  const loadConversationsList = async () => {
+  const loadConversationsList = useCallback(async () => {
     try {
       const result = await send(GetConversations, {});
       setConversations(result.conversations);
     } catch (error) {
       console.error("Failed to load conversations:", error);
     }
-  };
+  }, [send]);
 
-  const handleSendMessage = async () => {
-    if (!inputMessage.trim() || !isConnected) return;
+  const handleSendMessage = useCallback(
+    async (messageContent?: string) => {
+      // Use provided message content or fall back to inputMessage state
+      const contentToSend = messageContent ?? inputMessage;
+      if (!contentToSend.trim() || !isConnected) return;
 
-    // Store the message in case we need to retry
-    const messageContent = inputMessage;
-    setLastFailedMessage("");
+      // Store the message in case we need to retry
+      const finalMessageContent = contentToSend;
+      setLastFailedMessage("");
 
-    const userMessage: Message = {
-      sender: "user",
-      text: messageContent,
-      timestamp: new Date().toISOString(),
-    };
+      const userMessage: Message = {
+        sender: "user",
+        text: finalMessageContent,
+        timestamp: new Date().toISOString(),
+      };
 
-    setMessages((prev) => [...prev, userMessage]);
-    setInputMessage("");
-    setLoadingStatus("Thinking...");
-    setIsLoading(true);
-    setHasAgentError(false);
-
-    try {
-      const result = await send(SendMessage, {
-        content: messageContent,
-        conversationId: currentConversationId,
-        selectedTools,
-      });
-
-      // Update the user message with its actual ID from the database
-      setMessages((prev) => {
-        const lastMessageIndex = prev.length - 1;
-        const lastMessage = prev[lastMessageIndex];
-        if (lastMessage && lastMessage.sender === "user") {
-          const newMessages = [...prev];
-          newMessages[lastMessageIndex] = {
-            ...lastMessage,
-            id: result.messageId,
-          };
-          return newMessages;
-        }
-        return prev;
-      });
-
-      // Update conversation ID if this was first message
-      if (!currentConversationId) {
-        setCurrentConversationId(result.conversationId);
-        // Refresh sidebar to show the new (placeholder) thread immediately
-        loadConversationsList();
+      setMessages((prev) => [...prev, userMessage]);
+      // Only clear input if we're using the inputMessage state (not when a message is provided)
+      if (!messageContent) {
+        setInputMessage("");
       }
-    } catch (error) {
-      console.error("Failed to send message:", error);
-      setIsLoading(false);
-      setLastFailedMessage(messageContent);
-      setHasAgentError(true);
-      setMessages((prev) => [
-        ...prev,
-        {
-          sender: "system",
-          text: `❌ Error: ${error instanceof Error ? error.message : "Unknown error"}`,
-          timestamp: new Date().toISOString(),
-          agentError: {
-            error: error instanceof Error ? error.message : "Unknown error",
-            canRetry: true,
-          },
-        },
-      ]);
-    }
-  };
+      setLoadingStatus("Thinking...");
+      setIsLoading(true);
+      setHasAgentError(false);
 
-  const handleNewConversation = async () => {
+      try {
+        const result = await send(SendMessage, {
+          content: finalMessageContent,
+          conversationId: currentConversationId,
+          selectedTools,
+        });
+
+        // Update the user message with its actual ID from the database
+        setMessages((prev) => {
+          const lastMessageIndex = prev.length - 1;
+          const lastMessage = prev[lastMessageIndex];
+          if (lastMessage && lastMessage.sender === "user") {
+            const newMessages = [...prev];
+            newMessages[lastMessageIndex] = {
+              ...lastMessage,
+              id: result.messageId,
+            };
+            return newMessages;
+          }
+          return prev;
+        });
+
+        // Update conversation ID if this was first message
+        if (!currentConversationId) {
+          setCurrentConversationId(result.conversationId);
+          // Refresh sidebar to show the new (placeholder) thread immediately
+          loadConversationsList();
+        }
+      } catch (error) {
+        console.error("Failed to send message:", error);
+        setIsLoading(false);
+        setLastFailedMessage(finalMessageContent);
+        setHasAgentError(true);
+        setMessages((prev) => [
+          ...prev,
+          {
+            sender: "system",
+            text: `❌ Error: ${error instanceof Error ? error.message : "Unknown error"}`,
+            timestamp: new Date().toISOString(),
+            agentError: {
+              error: error instanceof Error ? error.message : "Unknown error",
+              canRetry: true,
+            },
+          },
+        ]);
+      }
+    },
+    [inputMessage, isConnected, currentConversationId, selectedTools, send, loadConversationsList],
+  );
+
+  const handleNewConversation = useCallback(async () => {
     try {
       const result = await send(LoadConversation, {});
       setCurrentConversationId(result.conversationId);
@@ -350,28 +406,31 @@ export default function ChatPage() {
     } catch (error) {
       console.error("Failed to create conversation:", error);
     }
-  };
+  }, [send]);
 
-  const handleLoadConversation = async (conversationId?: string) => {
-    try {
-      const result = await send(LoadConversation, { conversationId });
-      setCurrentConversationId(result.conversationId);
-      setCurrentConversationTitle(result.title);
-      setMessages(
-        result.messages.map((msg) => ({
-          id: msg.id,
-          sender: msg.role,
-          text: msg.content,
-          timestamp: msg.createdAt,
-        })),
-      );
-      setHasSelectedConversation(true);
-    } catch (error) {
-      console.error("Failed to load conversation:", error);
-    }
-  };
+  const handleLoadConversation = useCallback(
+    async (conversationId?: string) => {
+      try {
+        const result = await send(LoadConversation, { conversationId });
+        setCurrentConversationId(result.conversationId);
+        setCurrentConversationTitle(result.title);
+        setMessages(
+          result.messages.map((msg) => ({
+            id: msg.id,
+            sender: msg.role,
+            text: msg.content,
+            timestamp: msg.createdAt,
+          })),
+        );
+        setHasSelectedConversation(true);
+      } catch (error) {
+        console.error("Failed to load conversation:", error);
+      }
+    },
+    [send],
+  );
 
-  const handleRetryMessage = async () => {
+  const handleRetryMessage = useCallback(async () => {
     if (!lastFailedMessage.trim()) return;
 
     const userMessage: Message = {
@@ -427,7 +486,136 @@ export default function ChatPage() {
         },
       ]);
     }
-  };
+  }, [lastFailedMessage, currentConversationId, send]);
+
+  // ============================================================================
+  // Auto-Answer Functions
+  // ============================================================================
+
+  const generateSuggestedAnswer = useCallback(
+    async (instructionsOverride?: string) => {
+      console.log("[AutoAnswer] generateSuggestedAnswer called", {
+        currentConversationId,
+        isAutoAnswerMode,
+        isStarting: isStartingAutoAnswerRef.current,
+        refCurrent: isGeneratingSuggestionRef.current,
+      });
+
+      // Allow execution if we're starting or if auto-answer mode is active
+      if (!currentConversationId || (!isAutoAnswerMode && !isStartingAutoAnswerRef.current)) {
+        console.log("[AutoAnswer] bailing out: precondition failed");
+        return;
+      }
+
+      // Use override if provided (for initial call), otherwise use state
+      const instructionsToUse = instructionsOverride ?? autoAnswerInstructions;
+
+      if (isGeneratingSuggestionRef.current) {
+        console.log("[AutoAnswer] bailing out: already generating (ref is true)");
+        return;
+      }
+
+      try {
+        console.log("[AutoAnswer] Starting generation...");
+        isGeneratingSuggestionRef.current = true;
+        setIsGeneratingSuggestion(true);
+        // Clear input to prepare for streaming
+        setInputMessage("");
+
+        const result = await send(SuggestAnswer, {
+          conversationId: currentConversationId,
+          instructions: instructionsToUse,
+        });
+
+        // Reset the starting flag after first successful generation
+        // Note: We need to capture the starting state BEFORE resetting since the
+        // closure may have stale isAutoAnswerMode value when started via startAutoAnswerMode
+        const wasStarting = isStartingAutoAnswerRef.current;
+        isStartingAutoAnswerRef.current = false;
+
+        // The result contains the full suggested answer
+        // Check wasStarting to handle the case where isAutoAnswerMode hasn't propagated yet
+        if (result.suggestedAnswer && (isAutoAnswerMode || wasStarting)) {
+          console.log("[AutoAnswer] Generation complete, sending message...");
+          // The chunks have been streaming to inputMessage for visual feedback
+          // Now send the complete result directly to ensure the full message is sent
+          await handleSendMessage(result.suggestedAnswer);
+          console.log("[AutoAnswer] Message sent, clearing input");
+          setInputMessage("");
+
+          // Trigger next iteration immediately when ready (via response effect)
+        } else {
+          console.log("[AutoAnswer] Result ignored:", {
+            hasSuggestedAnswer: !!result.suggestedAnswer,
+            isAutoAnswerMode,
+            wasStarting,
+          });
+        }
+      } catch (error) {
+        console.error("Error generating suggested answer:", error);
+        toast.error("Failed to generate auto-answer. Disabling auto-answer mode.");
+        setIsAutoAnswerMode(false);
+        isStartingAutoAnswerRef.current = false;
+      } finally {
+        console.log("[AutoAnswer] Finally block, resetting ref");
+        setIsGeneratingSuggestion(false);
+        isGeneratingSuggestionRef.current = false;
+      }
+    },
+    [currentConversationId, isAutoAnswerMode, autoAnswerInstructions, send, handleSendMessage],
+  );
+
+  const startAutoAnswerMode = useCallback(
+    (instructions: string) => {
+      console.log("[AutoAnswer] startAutoAnswerMode called");
+      setAutoAnswerInstructions(instructions);
+      setIsAutoAnswerMode(true);
+      // Set flag to allow immediate execution before state propagates
+      isStartingAutoAnswerRef.current = true;
+      // Pass instructions directly to avoid state timing issue
+      generateSuggestedAnswer(instructions);
+    },
+    [generateSuggestedAnswer],
+  );
+
+  const stopAutoAnswerMode = useCallback(() => {
+    setIsAutoAnswerMode(false);
+    setIsGeneratingSuggestion(false);
+    isStartingAutoAnswerRef.current = false;
+    isGeneratingSuggestionRef.current = false;
+
+    if (autoAnswerTimeoutRef.current) {
+      clearTimeout(autoAnswerTimeoutRef.current);
+      autoAnswerTimeoutRef.current = null;
+    }
+  }, []);
+
+  // Response-triggered continuation
+  useEffect(() => {
+    if (isAutoAnswerMode && !isLoading && messages.length > 0 && !isGeneratingSuggestion) {
+      const lastMessage = messages[messages.length - 1];
+
+      if (lastMessage?.sender === "assistant") {
+        // Trigger immediately without delay
+        generateSuggestedAnswer();
+      }
+    }
+
+    return () => {
+      if (autoAnswerTimeoutRef.current) {
+        clearTimeout(autoAnswerTimeoutRef.current);
+      }
+    };
+  }, [messages, isLoading, isAutoAnswerMode, isGeneratingSuggestion, generateSuggestedAnswer]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (autoAnswerTimeoutRef.current) {
+        clearTimeout(autoAnswerTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // ============================================================================
   // Status Display
@@ -601,7 +789,7 @@ export default function ChatPage() {
                             <MarkdownRenderer content={message.text} />
                           ) : (
                             <>
-                              <p className="whitespace-pre-wrap">{message.text}</p>
+                              <MarkdownRenderer content={message.text} />
                               {message.agentError && message.agentError.canRetry && (
                                 <div className="mt-2 flex gap-2">
                                   <Button
@@ -640,11 +828,58 @@ export default function ChatPage() {
                 </div>
 
                 <div className="bg-card border-t p-3">
+                  {/* Auto-answer status banner */}
+                  {isAutoAnswerMode && (
+                    <div className="bg-muted mb-2 flex items-center justify-between rounded-md px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <Zap className="h-4 w-4" />
+                        <span className="text-sm font-medium">
+                          Auto-answer mode active
+                          {isGeneratingSuggestion && " (generating response...)"}
+                        </span>
+                      </div>
+                      <Button
+                        onClick={stopAutoAnswerMode}
+                        variant="destructive"
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                      >
+                        <Square className="mr-1 h-3 w-3" />
+                        Stop
+                      </Button>
+                    </div>
+                  )}
+
                   <div className="flex items-end gap-2">
+                    {/* Auto-answer toggle button */}
+                    {!isAutoAnswerMode ? (
+                      <Button
+                        onClick={() => setIsInstructionsDialogOpen(true)}
+                        disabled={!isConnected || isLoading || messages.length === 0}
+                        variant="outline"
+                        size="icon"
+                        className="h-10 w-10 shrink-0"
+                        title="Enable auto-answer mode"
+                      >
+                        <Zap className="h-4 w-4" />
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={stopAutoAnswerMode}
+                        disabled={!isConnected}
+                        variant="destructive"
+                        size="icon"
+                        className="h-10 w-10 shrink-0"
+                        title="Stop auto-answer mode"
+                      >
+                        <Square className="h-4 w-4" />
+                      </Button>
+                    )}
+
                     <ToolSelector
                       selectedTools={selectedTools}
                       onToolsChange={setSelectedTools}
-                      disabled={!isConnected || isLoading}
+                      disabled={!isConnected || isLoading || isAutoAnswerMode}
                     />
                     <Textarea
                       ref={textareaRef}
@@ -652,14 +887,15 @@ export default function ChatPage() {
                       onChange={handleInputChange}
                       onKeyDown={handleKeyDown}
                       placeholder="Type your message..."
-                      disabled={!isConnected || isLoading}
+                      disabled={!isConnected || isLoading || isAutoAnswerMode}
                       className="max-h-[120px] min-h-[40px] flex-1 resize-none"
                       rows={1}
                     />
                     <Button
-                      onClick={handleSendMessage}
+                      onClick={() => handleSendMessage()}
                       disabled={
-                        !allowSendingMessages && (!isConnected || isLoading || !inputMessage.trim())
+                        !allowSendingMessages &&
+                        (!isConnected || isLoading || !inputMessage.trim() || isAutoAnswerMode)
                       }
                       className="h-10 w-10 rounded-full p-2"
                       aria-label="Send"
@@ -673,6 +909,46 @@ export default function ChatPage() {
           </div>
         </div>
       </div>
+
+      {/* Auto-answer instructions dialog */}
+      <Dialog open={isInstructionsDialogOpen} onOpenChange={setIsInstructionsDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Auto-Answer Mode</DialogTitle>
+            <DialogDescription>
+              Enter instructions for how the AI should respond on your behalf. The AI will
+              automatically generate and send responses based on these instructions until you stop
+              the mode.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Textarea
+              value={instructionsInput}
+              onChange={(e) => setInstructionsInput(e.target.value)}
+              placeholder="e.g., Respond as a curious interviewer who asks follow-up questions to learn more about the topic."
+              className="min-h-[120px] resize-none"
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsInstructionsDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (instructionsInput.trim()) {
+                  startAutoAnswerMode(instructionsInput.trim());
+                  setIsInstructionsDialogOpen(false);
+                  setInstructionsInput("");
+                }
+              }}
+              disabled={!instructionsInput.trim()}
+            >
+              Start Auto-Answer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
