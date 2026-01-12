@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/frontend/components/ui/button";
-import { Card } from "@/frontend/components/ui/card";
 import type { Conversation } from "@/shared/commands";
-
+import { PanelLeftClose, PanelLeft, Plus } from "lucide-react";
 import { groupConversations } from "@/frontend/lib/date-utils";
 
 interface ConversationSidebarProps {
@@ -18,6 +17,7 @@ export default function ConversationSidebar({
   onLoadConversation,
   onNewConversation,
 }: ConversationSidebarProps) {
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const groups = groupConversations(conversations);
 
   const renderConversation = (conversation: Conversation) => (
@@ -42,62 +42,116 @@ export default function ConversationSidebar({
   );
 
   return (
-    <div className="bg-card flex h-full w-64 flex-col border-r">
-      <div className="border-b p-4">
-        <Button onClick={onNewConversation} className="w-full justify-center" variant="default">
-          New Conversation
-        </Button>
-      </div>
-
-      <div className="custom-scrollbar flex-1 overflow-y-auto p-2">
-        {conversations.length === 0 ? (
-          <p className="text-muted-foreground px-2 py-4 text-center text-sm">
-            No conversations yet
-          </p>
+    <div
+      className={`bg-card flex h-full flex-col border-r transition-all duration-300 ease-in-out ${
+        isCollapsed ? "w-14" : "w-64"
+      }`}
+    >
+      {/* Header section */}
+      <div
+        className={`flex items-center border-b transition-all duration-300 ${
+          isCollapsed ? "flex-col gap-2 p-2" : "justify-between p-3"
+        }`}
+      >
+        {isCollapsed ? (
+          <>
+            <Button
+              onClick={() => setIsCollapsed(false)}
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10 transition-transform duration-200 hover:scale-105"
+              title="Expand sidebar"
+            >
+              <PanelLeft className="h-5 w-5" />
+            </Button>
+            <Button
+              onClick={onNewConversation}
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10 transition-transform duration-200 hover:scale-105"
+              title="New conversation"
+            >
+              <Plus className="h-5 w-5" />
+            </Button>
+          </>
         ) : (
           <>
-            {groups.today.length > 0 && (
-              <div className="mb-6">
-                <h3 className="text-muted-foreground mb-2 px-2 text-xs font-semibold tracking-wider uppercase">
-                  Today
-                </h3>
-                {groups.today.map(renderConversation)}
-              </div>
-            )}
-            {groups.yesterday.length > 0 && (
-              <div className="mb-6">
-                <h3 className="text-muted-foreground mb-2 px-2 text-xs font-semibold tracking-wider uppercase">
-                  Yesterday
-                </h3>
-                {groups.yesterday.map(renderConversation)}
-              </div>
-            )}
-            {groups.lastSevenDays.length > 0 && (
-              <div className="mb-6">
-                <h3 className="text-muted-foreground mb-2 px-2 text-xs font-semibold tracking-wider uppercase">
-                  Last 7 Days
-                </h3>
-                {groups.lastSevenDays.map(renderConversation)}
-              </div>
-            )}
-            {groups.lastThirtyDays.length > 0 && (
-              <div className="mb-6">
-                <h3 className="text-muted-foreground mb-2 px-2 text-xs font-semibold tracking-wider uppercase">
-                  Last 30 Days
-                </h3>
-                {groups.lastThirtyDays.map(renderConversation)}
-              </div>
-            )}
-            {groups.olderGroups.map((group) => (
-              <div key={group.title} className="mb-6">
-                <h3 className="text-muted-foreground mb-2 px-2 text-xs font-semibold tracking-wider uppercase">
-                  {group.title}
-                </h3>
-                {group.conversations.map(renderConversation)}
-              </div>
-            ))}
+            <Button
+              onClick={onNewConversation}
+              className="flex-1 justify-center transition-transform duration-200 hover:scale-[1.02]"
+              variant="default"
+            >
+              New Conversation
+            </Button>
+            <Button
+              onClick={() => setIsCollapsed(true)}
+              variant="ghost"
+              size="icon"
+              className="ml-2 h-9 w-9 shrink-0 transition-transform duration-200 hover:scale-105"
+              title="Collapse sidebar"
+            >
+              <PanelLeftClose className="h-4 w-4" />
+            </Button>
           </>
         )}
+      </div>
+
+      {/* Conversations list - animate opacity */}
+      <div
+        className={`custom-scrollbar flex-1 overflow-x-hidden overflow-y-auto transition-opacity duration-300 ${
+          isCollapsed ? "pointer-events-none opacity-0" : "opacity-100"
+        }`}
+      >
+        <div className="p-2">
+          {conversations.length === 0 ? (
+            <p className="text-muted-foreground px-2 py-4 text-center text-sm">
+              No conversations yet
+            </p>
+          ) : (
+            <>
+              {groups.today.length > 0 && (
+                <div className="animate-in fade-in mb-6 duration-300">
+                  <h3 className="text-muted-foreground mb-2 px-2 text-xs font-semibold tracking-wider uppercase">
+                    Today
+                  </h3>
+                  {groups.today.map(renderConversation)}
+                </div>
+              )}
+              {groups.yesterday.length > 0 && (
+                <div className="animate-in fade-in mb-6 duration-300">
+                  <h3 className="text-muted-foreground mb-2 px-2 text-xs font-semibold tracking-wider uppercase">
+                    Yesterday
+                  </h3>
+                  {groups.yesterday.map(renderConversation)}
+                </div>
+              )}
+              {groups.lastSevenDays.length > 0 && (
+                <div className="animate-in fade-in mb-6 duration-300">
+                  <h3 className="text-muted-foreground mb-2 px-2 text-xs font-semibold tracking-wider uppercase">
+                    Last 7 Days
+                  </h3>
+                  {groups.lastSevenDays.map(renderConversation)}
+                </div>
+              )}
+              {groups.lastThirtyDays.length > 0 && (
+                <div className="animate-in fade-in mb-6 duration-300">
+                  <h3 className="text-muted-foreground mb-2 px-2 text-xs font-semibold tracking-wider uppercase">
+                    Last 30 Days
+                  </h3>
+                  {groups.lastThirtyDays.map(renderConversation)}
+                </div>
+              )}
+              {groups.olderGroups.map((group) => (
+                <div key={group.title} className="animate-in fade-in mb-6 duration-300">
+                  <h3 className="text-muted-foreground mb-2 px-2 text-xs font-semibold tracking-wider uppercase">
+                    {group.title}
+                  </h3>
+                  {group.conversations.map(renderConversation)}
+                </div>
+              ))}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

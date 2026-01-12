@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useParams, useLocation } from "wouter";
 import { Button } from "@/frontend/components/ui/button";
 import { ArrowUp, Zap, Square } from "lucide-react";
 import { Textarea } from "@/frontend/components/ui/textarea";
@@ -6,7 +7,6 @@ import { useWebSocket } from "@/frontend/hooks/useWebSocket";
 import ConversationSidebar from "@/frontend/components/conversation-sidebar";
 import { MarkdownRenderer } from "@/frontend/components/markdown-renderer";
 import { ToolSelector } from "@/frontend/components/tool-selector";
-import { useDevMode } from "@/frontend/contexts/dev-mode-context";
 import { toast } from "sonner";
 import {
   SendMessage,
@@ -32,7 +32,6 @@ import {
   type ToolName,
   type Conversation,
 } from "@/shared/commands";
-import { groupConversations } from "@/frontend/lib/date-utils";
 import {
   Dialog,
   DialogContent,
@@ -41,6 +40,35 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/frontend/components/ui/dialog";
+
+// Random greetings for the landing page
+const GREETINGS = [
+  "What can I help you with?",
+  "Let's Grok",
+  "Grok & Coffee",
+  "Ready to explore?",
+  "What's on your mind?",
+  "Let's figure this out together",
+  "Ask me anything",
+  "Curious about something?",
+  "What shall we discover today?",
+  "Ready when you are",
+  "Let's dive in",
+  "How can I assist?",
+  "What would you like to know?",
+  "Let's chat",
+  "Fire away!",
+  "I'm all ears",
+  "What's the plan?",
+  "Let's make something happen",
+  "Thinking cap on",
+  "What's the puzzle?",
+  "Let's solve this",
+  "Your move",
+  "What's cooking?",
+  "Ready to roll",
+  "What brings you here?",
+];
 
 interface Message {
   id?: number;
@@ -67,10 +95,12 @@ export default function ChatPage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<string>();
   const [currentConversationTitle, setCurrentConversationTitle] = useState("New Chat");
-  const [hasSelectedConversation, setHasSelectedConversation] = useState(false);
   const [lastFailedMessage, setLastFailedMessage] = useState<string>("");
   const [hasAgentError, setHasAgentError] = useState(false);
   const [selectedTools, setSelectedTools] = useState<ToolName[]>([]);
+
+  // Random greeting - memoized to stay consistent during session
+  const greeting = useMemo(() => GREETINGS[Math.floor(Math.random() * GREETINGS.length)], []);
 
   // Auto-answer state
   const [isAutoAnswerMode, setIsAutoAnswerMode] = useState(false);
@@ -90,8 +120,6 @@ export default function ChatPage() {
       window.location.host
     }/chat-ws`,
   });
-
-  const { allowSendingMessages } = useDevMode();
 
   const isConnected = connectionState === "connected";
 
@@ -268,6 +296,22 @@ export default function ChatPage() {
   }, [isConnected]);
 
   // ============================================================================
+  // Dynamic page title
+  // ============================================================================
+
+  useEffect(() => {
+    if (
+      currentConversationTitle &&
+      currentConversationTitle !== "New Chat" &&
+      messages.length > 0
+    ) {
+      document.title = `${currentConversationTitle} - Super Chat`;
+    } else {
+      document.title = "Super Chat";
+    }
+  }, [currentConversationTitle, messages.length]);
+
+  // ============================================================================
   // Auto-scroll (throttled during streaming)
   // ============================================================================
 
@@ -402,7 +446,6 @@ export default function ChatPage() {
       setCurrentConversationId(result.conversationId);
       setCurrentConversationTitle(result.title);
       setMessages([]);
-      setHasSelectedConversation(true);
     } catch (error) {
       console.error("Failed to create conversation:", error);
     }
@@ -422,7 +465,10 @@ export default function ChatPage() {
             timestamp: msg.createdAt,
           })),
         );
-        setHasSelectedConversation(true);
+        // Navigate to conversation URL if not already there
+        if (conversationId && window.location.pathname !== `/c/${conversationId}`) {
+          navigate(`/c/${conversationId}`);
+        }
       } catch (error) {
         console.error("Failed to load conversation:", error);
       }
@@ -644,19 +690,19 @@ export default function ChatPage() {
 
   return (
     <div className="bg-background flex h-screen">
-      {hasSelectedConversation && (
-        <ConversationSidebar
-          conversations={conversations}
-          currentConversationId={currentConversationId}
-          onLoadConversation={handleLoadConversation}
-          onNewConversation={handleNewConversation}
-        />
-      )}
+      <ConversationSidebar
+        conversations={conversations}
+        currentConversationId={currentConversationId}
+        onLoadConversation={handleLoadConversation}
+        onNewConversation={handleNewConversation}
+      />
 
       <div className="flex min-h-0 flex-1 flex-col">
         <header className="bg-card flex shrink-0 items-center justify-between border-b px-4 py-5 shadow-sm">
           <h1 className="text-foreground text-xl font-bold">
-            {currentConversationTitle} - AI Chat
+            {messages.length > 0 && currentConversationTitle !== "New Chat"
+              ? `${currentConversationTitle} - Super Chat`
+              : "Super Chat"}
           </h1>
           <div className="flex items-center gap-2">
             <span
@@ -678,145 +724,107 @@ export default function ChatPage() {
 
         <div className="min-h-0 flex-1 overflow-hidden p-4">
           <div className="flex h-full flex-col rounded-xl border border-neutral-600/50 px-1 py-2 shadow-md dark:border-neutral-500/50">
-            {!hasSelectedConversation ? (
-              <div className="custom-scrollbar flex-1 overflow-y-auto p-6">
-                <div className="mx-auto max-w-4xl">
-                  <h2 className="text-foreground mb-6 text-2xl font-bold">Choose a conversation</h2>
-
-                  <div className="mb-8">
+            {messages.length === 0 ? (
+              /* Centered landing with greeting */
+              <div className="flex flex-1 flex-col items-center justify-center p-6">
+                <h2 className="text-foreground mb-8 text-3xl font-semibold md:text-4xl">
+                  {greeting}
+                </h2>
+                <div className="w-full max-w-2xl">
+                  <div className="flex items-end gap-2">
+                    <ToolSelector
+                      selectedTools={selectedTools}
+                      onToolsChange={setSelectedTools}
+                      disabled={!isConnected || isLoading || isAutoAnswerMode}
+                    />
+                    <Textarea
+                      ref={textareaRef}
+                      value={inputMessage}
+                      onChange={handleInputChange}
+                      onKeyDown={handleKeyDown}
+                      placeholder="Type your message..."
+                      disabled={!isConnected || isLoading || isAutoAnswerMode}
+                      className="max-h-[120px] min-h-[40px] flex-1 resize-none"
+                      rows={1}
+                    />
                     <Button
-                      onClick={handleNewConversation}
-                      className="w-full px-6 py-3 text-lg sm:w-auto"
-                      size="lg"
-                      disabled={!isConnected}
+                      onClick={() => handleSendMessage()}
+                      disabled={
+                        !isConnected || isLoading || !inputMessage.trim() || isAutoAnswerMode
+                      }
+                      className="h-10 w-10 rounded-full p-2"
+                      aria-label="Send"
                     >
-                      + New Chat
+                      <ArrowUp className="h-4 w-4" />
                     </Button>
                   </div>
-
-                  {conversations.length > 0 ? (
-                    <div>
-                      <div className="space-y-8">
-                        {(() => {
-                          const groups = groupConversations(conversations);
-                          const renderGroup = (title: string, items: Conversation[]) => {
-                            if (items.length === 0) return null;
-                            return (
-                              <div>
-                                <h3 className="text-muted-foreground mb-3 text-sm font-semibold tracking-wider uppercase">
-                                  {title}
-                                </h3>
-                                <div className="space-y-3">
-                                  {items.map((conversation) => (
-                                    <div
-                                      key={conversation.id}
-                                      onClick={() => handleLoadConversation(conversation.id)}
-                                      className="bg-card border-border hover:bg-muted/50 cursor-pointer rounded-lg border p-4 transition-colors"
-                                    >
-                                      <h4 className="text-foreground truncate font-medium">
-                                        {conversation.title}
-                                      </h4>
-                                      <p className="text-muted-foreground mt-1 text-sm">
-                                        {new Date(conversation.updatedAt).toLocaleString()}
-                                      </p>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            );
-                          };
-
-                          return (
-                            <>
-                              {renderGroup("Today", groups.today)}
-                              {renderGroup("Yesterday", groups.yesterday)}
-                              {renderGroup("Last 7 Days", groups.lastSevenDays)}
-                              {renderGroup("Last 30 Days", groups.lastThirtyDays)}
-                              {groups.olderGroups.map((group) =>
-                                renderGroup(group.title, group.conversations),
-                              )}
-                            </>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="py-12 text-center">
-                      <p className="text-muted-foreground">No previous conversations found.</p>
-                    </div>
-                  )}
                 </div>
               </div>
             ) : (
+              /* Chat messages view */
               <>
                 <div className="custom-scrollbar flex-1 space-y-4 overflow-y-auto p-4">
-                  {messages.length === 0 ? (
-                    <div className="flex h-full items-center justify-center">
-                      <p className="text-muted-foreground">Start a conversation with AI...</p>
-                    </div>
-                  ) : (
-                    messages.map((message, index) => (
+                  {messages.map((message, index) => (
+                    <div
+                      key={index}
+                      className={`${
+                        message.sender === "user"
+                          ? "flex justify-end"
+                          : message.sender === "assistant"
+                            ? "flex justify-center"
+                            : "flex justify-start"
+                      }`}
+                    >
                       <div
-                        key={index}
                         className={`${
                           message.sender === "user"
-                            ? "flex justify-end"
+                            ? "text-foreground max-w-xs rounded-lg bg-gray-200/60 p-3 md:max-w-md lg:max-w-lg xl:max-w-xl dark:bg-neutral-700/50"
                             : message.sender === "assistant"
-                              ? "flex justify-center"
-                              : "flex justify-start"
+                              ? "text-foreground max-w-2xl p-4 xl:max-w-3xl"
+                              : message.toolInfo
+                                ? `max-w-xs rounded-lg p-3 md:max-w-md lg:max-w-lg xl:max-w-xl ${
+                                    message.toolInfo.status === "error"
+                                      ? "border-l-4 border-red-500 bg-red-100 text-red-900 dark:bg-red-900/30 dark:text-red-100"
+                                      : message.toolInfo.status === "complete"
+                                        ? "border-l-4 border-green-500 bg-green-100 text-green-900 dark:bg-green-900/30 dark:text-green-100"
+                                        : "border-l-4 border-blue-500 bg-blue-100 text-blue-900 dark:bg-blue-900/30 dark:text-blue-100"
+                                  }`
+                                : message.agentError
+                                  ? "border-l-4 border-red-500 bg-red-100 text-red-900 dark:bg-red-900/30 dark:text-red-100"
+                                  : "bg-muted/70 text-muted-foreground max-w-xs rounded-lg p-3 md:max-w-md lg:max-w-lg xl:max-w-xl"
                         }`}
                       >
-                        <div
-                          className={`${
-                            message.sender === "user"
-                              ? "text-foreground max-w-xs rounded-lg bg-gray-200/60 p-3 md:max-w-md lg:max-w-lg xl:max-w-xl dark:bg-neutral-700/50"
-                              : message.sender === "assistant"
-                                ? "text-foreground max-w-2xl p-4 xl:max-w-3xl"
-                                : message.toolInfo
-                                  ? `max-w-xs rounded-lg p-3 md:max-w-md lg:max-w-lg xl:max-w-xl ${
-                                      message.toolInfo.status === "error"
-                                        ? "border-l-4 border-red-500 bg-red-100 text-red-900 dark:bg-red-900/30 dark:text-red-100"
-                                        : message.toolInfo.status === "complete"
-                                          ? "border-l-4 border-green-500 bg-green-100 text-green-900 dark:bg-green-900/30 dark:text-green-100"
-                                          : "border-l-4 border-blue-500 bg-blue-100 text-blue-900 dark:bg-blue-900/30 dark:text-blue-100"
-                                    }`
-                                  : message.agentError
-                                    ? "border-l-4 border-red-500 bg-red-100 text-red-900 dark:bg-red-900/30 dark:text-red-100"
-                                    : "bg-muted/70 text-muted-foreground max-w-xs rounded-lg p-3 md:max-w-md lg:max-w-lg xl:max-w-xl"
+                        {message.sender === "assistant" ? (
+                          <MarkdownRenderer content={message.text} />
+                        ) : (
+                          <>
+                            <MarkdownRenderer content={message.text} />
+                            {message.agentError && message.agentError.canRetry && (
+                              <div className="mt-2 flex gap-2">
+                                <Button
+                                  onClick={handleRetryMessage}
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs"
+                                >
+                                  Try Again
+                                </Button>
+                              </div>
+                            )}
+                          </>
+                        )}
+                        <p
+                          className={`mt-1 text-xs ${
+                            message.sender === "assistant"
+                              ? "text-muted-foreground text-center"
+                              : "text-muted-foreground text-right"
                           }`}
                         >
-                          {message.sender === "assistant" ? (
-                            <MarkdownRenderer content={message.text} />
-                          ) : (
-                            <>
-                              <MarkdownRenderer content={message.text} />
-                              {message.agentError && message.agentError.canRetry && (
-                                <div className="mt-2 flex gap-2">
-                                  <Button
-                                    onClick={handleRetryMessage}
-                                    size="sm"
-                                    variant="outline"
-                                    className="text-xs"
-                                  >
-                                    Try Again
-                                  </Button>
-                                </div>
-                              )}
-                            </>
-                          )}
-                          <p
-                            className={`mt-1 text-xs ${
-                              message.sender === "assistant"
-                                ? "text-muted-foreground text-center"
-                                : "text-muted-foreground text-right"
-                            }`}
-                          >
-                            {new Date(message.timestamp).toLocaleTimeString()}
-                          </p>
-                        </div>
+                          {new Date(message.timestamp).toLocaleTimeString()}
+                        </p>
                       </div>
-                    ))
-                  )}
+                    </div>
+                  ))}
                   {isLoading && (
                     <div className="flex justify-center">
                       <div className="text-foreground max-w-2xl p-4 xl:max-w-3xl">
@@ -894,8 +902,7 @@ export default function ChatPage() {
                     <Button
                       onClick={() => handleSendMessage()}
                       disabled={
-                        !allowSendingMessages &&
-                        (!isConnected || isLoading || !inputMessage.trim() || isAutoAnswerMode)
+                        !isConnected || isLoading || !inputMessage.trim() || isAutoAnswerMode
                       }
                       className="h-10 w-10 rounded-full p-2"
                       aria-label="Send"

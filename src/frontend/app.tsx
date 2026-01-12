@@ -1,8 +1,6 @@
 import { Route, Switch } from "wouter";
 import { lazy } from "react";
 import { GlobalLayout } from "./global-layout";
-import { DevModeProvider } from "@/frontend/contexts/dev-mode-context";
-import { DevModeOverlay } from "@/frontend/components/dev-mode-overlay";
 import { Toaster } from "@/frontend/components/ui/sonner";
 
 const HomePage = lazy(() => import("@/frontend/pages/home/home-page"));
@@ -12,11 +10,10 @@ const NotFoundPage = lazy(() => import("@/frontend/pages/not-found/not-found-pag
 
 function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <DevModeProvider>
+    <>
       {children}
       <Toaster />
-      {process.env.NODE_ENV !== "production" && <DevModeOverlay />}
-    </DevModeProvider>
+    </>
   );
 }
 

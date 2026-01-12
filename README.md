@@ -1,6 +1,6 @@
-# AI Command Center
+# Super Chat
 
-A sandbox for training AI agents to interact with UI elements.
+An expanded AI chat experience inspired by ChatGPT and Grok.
 
 ## Quickstart
 
@@ -40,12 +40,11 @@ Visit http://localhost:3000
 - Bun (runtime/server)
 - React 19 + Tailwind 4 + Wouter
 - Drizzle ORM (SQLite)
-- xAI Grok agent w/ web tools
+- xAI/Grok for the main agent brain + Mistral for small tasks
 - Go FFI for HTML processing
 
 ## Features
 
-- AI chat w/ tool use
-- Web search/fetch
-- Todo app sandbox
-- Conv history
+- AI chat with streaming responses
+- Deep research with web search capabilities
+- Conversation persistence
