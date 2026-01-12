@@ -83,24 +83,53 @@ ${tools.deep_research ? "- When you need current information from the web, use t
   }
 
   /**
+   * Chunk type for distinguishing between reasoning and text content
+   */
+  static readonly ChunkType = {
+    REASONING: "reasoning",
+    TEXT: "text",
+  } as const;
+
+  /**
    * Generate a response to the user's message
    * @param prompt The user's message
-   * @returns Stream of text chunks
+   * @param abortSignal Optional AbortSignal to stop generation
+   * @returns Stream of objects with type ('reasoning' | 'text') and content
    */
-  async *generateResponse(prompt: string): AsyncGenerator<string, void, unknown> {
+  async *generateResponse(
+    prompt: string,
+    abortSignal?: AbortSignal,
+  ): AsyncGenerator<{ type: "reasoning" | "text"; content: string }, void, unknown> {
     console.log(
       "[CHAT_AGENT] generateResponse called with:",
       prompt.substring(0, 100) + (prompt.length > 100 ? "..." : ""),
     );
     try {
-      const result = await this.agent.stream({ prompt });
+      const result = await this.agent.stream({ prompt, abortSignal });
 
-      // AI SDK handles tool execution automatically with onInputStart callbacks
-      // Just stream the response text
-      for await (const chunk of result.textStream) {
-        yield chunk;
+      // Use fullStream to get both reasoning and text chunks
+      for await (const chunk of result.fullStream) {
+        // Check if aborted before yielding
+        if (abortSignal?.aborted) {
+          console.log("[CHAT_AGENT] Generation aborted by user");
+          return;
+        }
+
+        // Handle different chunk types
+        if (chunk.type === "reasoning-delta") {
+          yield { type: "reasoning", content: chunk.text };
+        } else if (chunk.type === "text-delta") {
+          yield { type: "text", content: chunk.text };
+        }
+        // Ignore other chunk types (tool-call, tool-result, etc. - handled by onStepFinish)
       }
     } catch (error) {
+      // Check if this was an abort - if so, exit gracefully without error
+      if (abortSignal?.aborted || (error instanceof Error && error.name === "AbortError")) {
+        console.log("[CHAT_AGENT] Generation aborted");
+        return;
+      }
+
       const errorId = crypto.randomUUID();
       console.error(`[CHAT_AGENT] Error ${errorId}:`, error);
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
@@ -115,7 +144,10 @@ ${tools.deep_research ? "- When you need current information from the web, use t
       }
 
       // Still yield a friendly error message to the stream with reference ID
-      yield `❌ Sorry, I encountered an error while generating a response. (Ref: ${errorId.slice(0, 8)})`;
+      yield {
+        type: "text",
+        content: `❌ Sorry, I encountered an error while generating a response. (Ref: ${errorId.slice(0, 8)})`,
+      };
     }
   }
 

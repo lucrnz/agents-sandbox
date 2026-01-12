@@ -7,6 +7,16 @@ import {
   createCommandError,
 } from "@/shared/command-system";
 import { commandHandlers } from "./command-handlers";
+import { runMigrations } from "@/backend/db/migrate";
+import { getDockerManager, questionRegistry } from "@/backend/services/coder-runtime";
+
+// Ensure DB schema is up-to-date before serving.
+await runMigrations();
+
+// Start periodic cleanup of expired containers
+setInterval(() => {
+  getDockerManager().cleanupExpired().catch(console.error);
+}, 60 * 1000); // Check every minute
 
 const server = serve<{ conversationId?: string }>({
   routes: {
@@ -76,9 +86,20 @@ const server = serve<{ conversationId?: string }>({
       }
     },
 
-    close(ws, code, reason) {
+    async close(ws, code, reason) {
       console.log(`WebSocket closed: ${code} - ${reason}`);
       ws.unsubscribe("chat");
+
+      const conversationId = ws.data.conversationId;
+      if (conversationId) {
+        questionRegistry.cancelConversation(conversationId);
+        // Best-effort container cleanup (only if container tool was used).
+        try {
+          await getDockerManager().destroyContainer(conversationId);
+        } catch {
+          // ignore
+        }
+      }
     },
   },
 });

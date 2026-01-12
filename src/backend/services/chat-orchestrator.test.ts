@@ -86,8 +86,8 @@ describe("ChatOrchestrator", () => {
       spyOn(ChatAgent.prototype, "generateResponse").mockImplementation(async function* (
         _content: string,
       ) {
-        yield "Hello ";
-        yield "world!";
+        yield { type: "text" as const, content: "Hello " };
+        yield { type: "text" as const, content: "world!" };
       }),
     );
   });
@@ -134,7 +134,7 @@ describe("ChatOrchestrator", () => {
     );
     const chunkEvents = sentEvents.filter((e) => e.event === "ai_response_chunk");
     expect(chunkEvents).toHaveLength(2);
-    expect(chunkEvents[0].payload.delta).toBe("Hello ");
-    expect(chunkEvents[1].payload.delta).toBe("world!");
+    expect(chunkEvents[0]!.payload.delta).toBe("Hello ");
+    expect(chunkEvents[1]!.payload.delta).toBe("world!");
   });
 });

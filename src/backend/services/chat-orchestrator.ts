@@ -3,9 +3,11 @@ import { createEventMessage } from "@/shared/command-system";
 import {
   AIResponseEvent,
   AIResponseChunkEvent,
+  AIReasoningChunkEvent,
   ConversationUpdatedEvent,
   AgentStatusUpdateEvent,
   ChatAgentErrorEvent,
+  GenerationStoppedEvent,
   type ToolName,
 } from "@/shared/commands";
 import {
@@ -13,12 +15,18 @@ import {
   updateMessage,
   updateConversation,
   getConversationWithMessages,
+  ensureDefaultProject,
+  getConversationProject,
+  setConversationProject,
 } from "@/backend/db";
 import { ChatAgent } from "@/backend/agent/chat-agent";
+import { CoderAgent } from "@/backend/agent/coder-agent";
 import { generateStatusMessage } from "@/backend/agent/deep-research.js";
 import { generateConversationTitle } from "@/backend/agent/title-generation.js";
 import { DEFAULT_CONVERSATION_TITLE_PREFIX } from "@/backend/agent/config.js";
 import { BackgroundTaskTracker } from "./background-task-tracker";
+import { ActiveGenerationRegistry } from "./active-generation-registry";
+import { getDockerManager, questionRegistry } from "./coder-runtime";
 
 export type ChatOrchestratorContext = {
   ws: ServerWebSocket<{ conversationId?: string }>;
@@ -99,6 +107,10 @@ export class ChatOrchestrator {
    * Handles the AI agent interaction and streaming response
    */
   private async streamAIResponse(content: string) {
+    // Create AbortController for this generation
+    const abortController = new AbortController();
+    ActiveGenerationRegistry.register(this.conversationId, abortController);
+
     try {
       console.log("[CHAT_ORCHESTRATOR] Starting AI response flow");
 
@@ -111,75 +123,139 @@ export class ChatOrchestrator {
         throw new Error("Failed to create assistant message");
       }
 
-      // Create a new ChatAgent instance with callbacks for tool events
-      const agent = new ChatAgent({
-        enabledTools: this.selectedTools,
-        onToolCall: (toolName, args) => {
-          let statusMessage = "";
+      // Register the message ID with the generation registry
+      ActiveGenerationRegistry.setMessageId(this.conversationId, aiMessage.id);
 
-          // Generate friendly status messages for known tools
-          if (toolName === "deep_research") {
-            statusMessage = generateStatusMessage(args || null);
-          } else if (toolName === "web_search") {
-            statusMessage = args?.query ? `Searching for: "${args.query}"` : "Searching web...";
-          } else if (toolName === "web_fetch") {
-            statusMessage = args?.url ? `Fetching: ${args.url}` : "Fetching url...";
-          } else if (toolName === "view") {
-            statusMessage = args?.path ? `Reading file: ${args.path}` : "Reading file...";
-          } else if (toolName === "grep") {
-            statusMessage = args?.pattern
-              ? `Searching for "${args.pattern}" in file...`
-              : "Searching in file...";
-          }
-
-          this.emitEvent(AgentStatusUpdateEvent.name, {
-            conversationId: this.conversationId,
-            status: statusMessage,
-            timestamp: new Date().toISOString(),
-          });
-        },
-        onToolResult: (toolName, result, error) => {
-          // We don't report tool results to the user as per requirements
-        },
-        onCriticalError: (error, originalError) => {
-          const errorId = crypto.randomUUID();
-          console.error(
-            `[CHAT_ORCHESTRATOR] Critical Agent Error (ID: ${errorId}):`,
-            originalError || error,
-          );
-
-          this.emitEvent(ChatAgentErrorEvent.name, {
-            conversationId: this.conversationId,
-            error: "The AI agent encountered a critical error.",
-            originalError: `Error ID: ${errorId}`,
-            canRetry: true,
-            timestamp: new Date().toISOString(),
-          });
-        },
+      // Emit initial thinking phase
+      this.emitEvent(AgentStatusUpdateEvent.name, {
+        conversationId: this.conversationId,
+        phase: "thinking",
+        timestamp: new Date().toISOString(),
       });
 
-      // Stream response from the agent
-      const stream = agent.generateResponse(content);
+      // Create a new ChatAgent instance with callbacks for tool events
+      const enabled = this.selectedTools ?? [];
+      const isCoderAgent = enabled.includes("filesystem") || enabled.includes("container");
 
-      let updateCount = 0;
-      for await (const chunk of stream) {
-        fullResponse += chunk;
-        updateCount++;
+      const onToolCall = (toolName: string, args: any) => {
+        let statusMessage = "";
 
-        // Emit chunk to client for real-time streaming
-        this.emitEvent(AIResponseChunkEvent.name, {
-          messageId: aiMessage.id,
+        if (toolName === "deep_research") {
+          statusMessage = generateStatusMessage(args || null);
+        } else if (toolName === "bash") {
+          statusMessage = "Running a container command...";
+        } else if (toolName === "write_file" || toolName === "edit_file") {
+          statusMessage = "Editing project files...";
+        } else if (toolName === "read_file" || toolName === "list_files" || toolName === "grep") {
+          statusMessage = "Reading project files...";
+        } else if (toolName === "ask_question") {
+          statusMessage = "Waiting for your answer...";
+        }
+
+        this.emitEvent(AgentStatusUpdateEvent.name, {
           conversationId: this.conversationId,
-          delta: chunk,
+          phase: "tool_use",
+          message: statusMessage,
           timestamp: new Date().toISOString(),
         });
+      };
 
-        // Update message periodically (every 10 chunks or first chunk)
-        if (updateCount % 10 === 0 || updateCount === 1) {
-          await updateMessage(aiMessage.id, fullResponse).catch((err) =>
-            console.error("[CHAT_ORCHESTRATOR] Error updating message:", err),
-          );
+      const onCriticalError = (error: Error, originalError?: string) => {
+        const errorId = crypto.randomUUID();
+        console.error(
+          `[CHAT_ORCHESTRATOR] Critical Agent Error (ID: ${errorId}):`,
+          originalError || error,
+        );
+
+        this.emitEvent(ChatAgentErrorEvent.name, {
+          conversationId: this.conversationId,
+          error: "The AI agent encountered a critical error.",
+          originalError: `Error ID: ${errorId}`,
+          canRetry: true,
+          timestamp: new Date().toISOString(),
+        });
+      };
+
+      const agent: ChatAgent | CoderAgent = isCoderAgent
+        ? await this.createCoderAgent({ enabledTools: enabled, onToolCall, onCriticalError })
+        : new ChatAgent({
+            enabledTools: enabled,
+            onToolCall,
+            onToolResult: () => {},
+            onCriticalError,
+          });
+
+      // Stream response from the agent with abort signal
+      const stream = agent.generateResponse(content, abortController.signal);
+
+      let updateCount = 0;
+      let fullReasoning = "";
+      let hasStartedGenerating = false;
+      for await (const chunk of stream) {
+        // Check if aborted
+        if (abortController.signal.aborted) {
+          console.log("[CHAT_ORCHESTRATOR] Generation aborted, stopping stream");
+          break;
         }
+
+        if (chunk.type === "reasoning") {
+          // Emit reasoning chunk to client for real-time display
+          fullReasoning += chunk.content;
+          this.emitEvent(AIReasoningChunkEvent.name, {
+            messageId: aiMessage.id,
+            conversationId: this.conversationId,
+            delta: chunk.content,
+            timestamp: new Date().toISOString(),
+          });
+        } else if (chunk.type === "text") {
+          // Emit generating phase on first text chunk
+          if (!hasStartedGenerating) {
+            hasStartedGenerating = true;
+            this.emitEvent(AgentStatusUpdateEvent.name, {
+              conversationId: this.conversationId,
+              phase: "generating",
+              timestamp: new Date().toISOString(),
+            });
+          }
+
+          fullResponse += chunk.content;
+          updateCount++;
+
+          // Update partial content in registry for stop functionality
+          ActiveGenerationRegistry.updatePartialContent(this.conversationId, fullResponse);
+
+          // Emit text chunk to client for real-time streaming
+          this.emitEvent(AIResponseChunkEvent.name, {
+            messageId: aiMessage.id,
+            conversationId: this.conversationId,
+            delta: chunk.content,
+            timestamp: new Date().toISOString(),
+          });
+
+          // Update message periodically (every 10 chunks or first chunk)
+          if (updateCount % 10 === 0 || updateCount === 1) {
+            await updateMessage(aiMessage.id, fullResponse).catch((err) =>
+              console.error("[CHAT_ORCHESTRATOR] Error updating message:", err),
+            );
+          }
+        }
+      }
+
+      // Check if aborted - handle differently
+      if (abortController.signal.aborted) {
+        console.log("[CHAT_ORCHESTRATOR] Finalizing aborted generation");
+        // Update message with partial content + stopped indicator
+        const stoppedContent = fullResponse + "\n\n*[Generation stopped by user]*";
+        await updateMessage(aiMessage.id, stoppedContent);
+
+        // Emit stopped event
+        this.emitEvent(GenerationStoppedEvent.name, {
+          conversationId: this.conversationId,
+          messageId: aiMessage.id,
+          partialContent: stoppedContent,
+          timestamp: new Date().toISOString(),
+        });
+        return;
       }
 
       // Final cleanup - update message with complete response
@@ -193,9 +269,74 @@ export class ChatOrchestrator {
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
+      // Check if this was an abort - if so, exit gracefully
+      if (
+        abortController.signal.aborted ||
+        (error instanceof Error && error.name === "AbortError")
+      ) {
+        console.log("[CHAT_ORCHESTRATOR] Generation aborted (caught in error handler)");
+        return;
+      }
+
       console.error("[CHAT_ORCHESTRATOR] AI Generation Error:", error);
       await this.handleError(error);
+    } finally {
+      // Mark generation as complete
+      ActiveGenerationRegistry.complete(this.conversationId);
     }
+  }
+
+  private async createCoderAgent(input: {
+    enabledTools: ToolName[];
+    onToolCall: (toolName: string, args: any) => void;
+    onCriticalError: (error: Error, originalError?: string) => void;
+  }) {
+    const existing = await getConversationProject(this.conversationId);
+    let projectId = existing?.projectId;
+    let permissionMode = (existing?.permissionMode as "ask" | "yolo") || "ask";
+
+    if (!projectId) {
+      const def = await ensureDefaultProject();
+      if (!def) {
+        throw new Error("Failed to ensure default project exists");
+      }
+
+      const saved = await setConversationProject({
+        conversationId: this.conversationId,
+        projectId: def.id,
+        permissionMode,
+      });
+
+      if (!saved) {
+        throw new Error("Failed to set conversation project");
+      }
+
+      projectId = saved.projectId;
+      permissionMode = saved.permissionMode as "ask" | "yolo";
+    }
+
+    const dockerManager = input.enabledTools.includes("container") ? getDockerManager() : undefined;
+
+    return new CoderAgent({
+      enabledTools: input.enabledTools,
+      context: {
+        conversationId: this.conversationId,
+        projectId,
+        permissionMode,
+      },
+      dockerManager,
+      askUser: async (question) => {
+        const { answer } = await questionRegistry.ask({
+          conversationId: this.conversationId,
+          question,
+          emit: (eventName: string, payload: any) => this.emitEvent(eventName, payload),
+        });
+        return answer;
+      },
+      onToolCall: input.onToolCall,
+      onToolResult: () => {},
+      onCriticalError: input.onCriticalError,
+    });
   }
 
   /**

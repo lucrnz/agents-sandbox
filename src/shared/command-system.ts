@@ -62,7 +62,9 @@ export type WebSocketMessage = CommandMessage | CommandResult | CommandError | E
 // ============================================================================
 
 class Registry {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private commands = new Map<string, CommandDef<any, any>>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private events = new Map<string, EventDef<any>>();
 
   command<TReq, TRes>(

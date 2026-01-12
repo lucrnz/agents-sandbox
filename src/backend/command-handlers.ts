@@ -1,18 +1,39 @@
 import type { ServerWebSocket } from "bun";
 import { registry, type CommandDef } from "@/shared/command-system";
-import { SendMessage, LoadConversation, GetConversations, SuggestAnswer } from "@/shared/commands";
+import {
+  SendMessage,
+  LoadConversation,
+  GetConversations,
+  SuggestAnswer,
+  StopGeneration,
+  CreateProject,
+  GetProjects,
+  GetProjectFiles,
+  ReadProjectFile,
+  DeleteProject,
+  ExportProject,
+  SelectProjectForConversation,
+  SetPermissionMode,
+  AnswerAgentQuestion,
+} from "@/shared/commands";
 import {
   getOrCreateConversation,
   getConversationWithMessages,
   getConversationsWithMessages,
   addMessage,
   getMessages,
+  ensureDefaultProject,
+  getConversationProject,
+  setConversationProject,
+  setConversationPermissionMode,
 } from "@/backend/db";
 import { ChatOrchestrator } from "@/backend/services/chat-orchestrator";
 import { bigModel } from "@/backend/agent/model-config";
 import { streamText } from "ai";
 import { createEventMessage } from "@/shared/command-system";
-import { SuggestAnswerChunkEvent } from "@/shared/commands";
+import { SuggestAnswerChunkEvent, AgentStatusUpdateEvent } from "@/shared/commands";
+import { ActiveGenerationRegistry } from "@/backend/services/active-generation-registry";
+import { projectService, questionRegistry } from "@/backend/services/coder-runtime";
 
 // ============================================================================
 // Command Handler Type
@@ -42,7 +63,8 @@ class CommandHandlerRegistry {
       throw new Error(`No handler registered for command: ${commandName}`);
     }
 
-    const validated = registry.validateCommandRequest(commandName, payload);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const validated = registry.validateCommandRequest(commandName, payload as any);
     const result = await handler(validated, context);
     return result;
   }
@@ -194,4 +216,173 @@ Just the suggested message itself.`;
     console.error("[SUGGEST_ANSWER] Error generating suggestion:", error);
     throw new Error("Failed to generate suggested answer");
   }
+});
+
+commandHandlers.register(StopGeneration, async (payload, context) => {
+  const { conversationId } = payload;
+  const { ws } = context;
+
+  console.log("[STOP_GENERATION] Stopping generation for conversation:", conversationId);
+
+  // Emit stopping phase immediately
+  const stoppingEvent = createEventMessage(AgentStatusUpdateEvent.name, {
+    conversationId,
+    phase: "stopping",
+    timestamp: new Date().toISOString(),
+  });
+  ws.send(JSON.stringify(stoppingEvent));
+
+  const result = ActiveGenerationRegistry.abort(conversationId);
+
+  if (result.aborted) {
+    console.log("[STOP_GENERATION] Successfully stopped generation");
+    return {
+      stopped: true,
+      partialContent: result.partialContent,
+    };
+  }
+
+  console.log("[STOP_GENERATION] No active generation found for conversation");
+  return {
+    stopped: false,
+    partialContent: undefined,
+  };
+});
+
+// ============================================================================
+// Projects
+// ============================================================================
+
+commandHandlers.register(CreateProject, async (payload) => {
+  const project = await projectService.createProject({
+    name: payload.name,
+    description: payload.description,
+  });
+
+  if (!project) {
+    throw new Error("Failed to create project");
+  }
+
+  return {
+    project: {
+      id: project.id,
+      name: project.name,
+      description: project.description ?? null,
+      updatedAt: project.updatedAt?.toISOString?.() ?? new Date().toISOString(),
+    },
+  };
+});
+
+commandHandlers.register(GetProjects, async () => {
+  const projects = await projectService.listProjects();
+  return {
+    projects: projects.map((p) => ({
+      id: p.id,
+      name: p.name,
+      description: p.description ?? null,
+      updatedAt: p.updatedAt?.toISOString?.() ?? new Date().toISOString(),
+    })),
+  };
+});
+
+commandHandlers.register(GetProjectFiles, async (payload) => {
+  const files = await projectService.listFiles(payload.projectId);
+  return {
+    projectId: payload.projectId,
+    files: files.map((f) => ({
+      path: f.path,
+      size: f.size,
+      mimeType: f.mimeType ?? null,
+      updatedAt: f.updatedAt?.toISOString?.() ?? new Date().toISOString(),
+    })),
+  };
+});
+
+commandHandlers.register(ReadProjectFile, async (payload) => {
+  const file = await projectService.readFileAsText(payload.projectId, payload.path);
+  return {
+    projectId: payload.projectId,
+    path: file.path,
+    content: file.content,
+    mimeType: file.mimeType,
+  };
+});
+
+commandHandlers.register(DeleteProject, async (payload) => {
+  await projectService.deleteProject(payload.projectId);
+  return { deleted: true };
+});
+
+commandHandlers.register(ExportProject, async (payload) => {
+  const exported = await projectService.exportProject(payload.projectId, payload.format);
+  const base64 = Buffer.from(exported.bytes).toString("base64");
+  return {
+    filename: exported.filename,
+    mimeType: exported.mimeType,
+    base64,
+  };
+});
+
+commandHandlers.register(SelectProjectForConversation, async (payload) => {
+  const existing = await getConversationProject(payload.conversationId);
+  const mode = (existing?.permissionMode as "ask" | "yolo") || "ask";
+
+  const saved = await setConversationProject({
+    conversationId: payload.conversationId,
+    projectId: payload.projectId,
+    permissionMode: mode,
+  });
+
+  if (!saved) {
+    throw new Error("Failed to select project for conversation");
+  }
+
+  return {
+    conversationId: saved.conversationId,
+    projectId: saved.projectId,
+    permissionMode: saved.permissionMode as "ask" | "yolo",
+  };
+});
+
+commandHandlers.register(SetPermissionMode, async (payload) => {
+  const existing = await getConversationProject(payload.conversationId);
+  if (!existing) {
+    const def = await ensureDefaultProject();
+    if (!def) {
+      throw new Error("Failed to ensure default project exists");
+    }
+    await setConversationProject({
+      conversationId: payload.conversationId,
+      projectId: def.id,
+      permissionMode: payload.permissionMode,
+    });
+  }
+
+  const updated = await setConversationPermissionMode({
+    conversationId: payload.conversationId,
+    permissionMode: payload.permissionMode,
+  });
+
+  if (!updated) {
+    throw new Error("Failed to set permission mode");
+  }
+
+  return {
+    conversationId: updated.conversationId,
+    projectId: updated.projectId,
+    permissionMode: updated.permissionMode as "ask" | "yolo",
+  };
+});
+
+// ============================================================================
+// Agent Questions (blocking)
+// ============================================================================
+
+commandHandlers.register(AnswerAgentQuestion, async (payload) => {
+  questionRegistry.answer({
+    questionId: payload.questionId,
+    selectedOptionId: payload.selectedOptionId,
+    inputValue: payload.inputValue,
+  });
+  return { acknowledged: true };
 });

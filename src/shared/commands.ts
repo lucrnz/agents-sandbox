@@ -5,7 +5,7 @@ import { registry } from "./command-system";
 // Shared Schemas
 // ============================================================================
 
-export const ToolNameSchema = z.enum(["deep_research"]);
+export const ToolNameSchema = z.enum(["deep_research", "filesystem", "container"]);
 export type ToolName = z.infer<typeof ToolNameSchema>;
 
 const MessageSchema = z.object({
@@ -18,6 +18,23 @@ const MessageSchema = z.object({
 const ConversationSchema = z.object({
   id: z.string(),
   title: z.string(),
+  updatedAt: z.string().datetime(),
+});
+
+export const ProjectPermissionModeSchema = z.enum(["ask", "yolo"]);
+export type ProjectPermissionMode = z.infer<typeof ProjectPermissionModeSchema>;
+
+const ProjectSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().nullable().optional(),
+  updatedAt: z.string().datetime(),
+});
+
+const ProjectFileSchema = z.object({
+  path: z.string(),
+  size: z.number().int().nonnegative(),
+  mimeType: z.string().nullable().optional(),
   updatedAt: z.string().datetime(),
 });
 
@@ -70,6 +87,114 @@ export const SuggestAnswer = registry.command(
   }),
 );
 
+export const StopGeneration = registry.command(
+  "stop_generation",
+  z.object({
+    conversationId: z.string().min(1, "Conversation ID is required"),
+  }),
+  z.object({
+    stopped: z.boolean(),
+    partialContent: z.string().optional(),
+  }),
+);
+
+// ============================================================================
+// Projects (CRUD + binding to conversations)
+// ============================================================================
+
+export const CreateProject = registry.command(
+  "create_project",
+  z.object({
+    name: z.string().min(1, "Project name is required"),
+    description: z.string().optional(),
+  }),
+  z.object({
+    project: ProjectSchema,
+  }),
+);
+
+export const GetProjects = registry.command(
+  "get_projects",
+  z.object({}),
+  z.object({
+    projects: z.array(ProjectSchema),
+  }),
+);
+
+export const GetProjectFiles = registry.command(
+  "get_project_files",
+  z.object({
+    projectId: z.string().min(1, "Project ID is required"),
+  }),
+  z.object({
+    projectId: z.string(),
+    files: z.array(ProjectFileSchema),
+  }),
+);
+
+export const ReadProjectFile = registry.command(
+  "read_project_file",
+  z.object({
+    projectId: z.string().min(1, "Project ID is required"),
+    path: z.string().min(1, "File path is required"),
+  }),
+  z.object({
+    projectId: z.string(),
+    path: z.string(),
+    content: z.string(),
+    mimeType: z.string().optional(),
+  }),
+);
+
+export const DeleteProject = registry.command(
+  "delete_project",
+  z.object({
+    projectId: z.string().min(1, "Project ID is required"),
+  }),
+  z.object({
+    deleted: z.boolean(),
+  }),
+);
+
+export const ExportProject = registry.command(
+  "export_project",
+  z.object({
+    projectId: z.string().min(1, "Project ID is required"),
+    format: z.enum(["zip", "tar.gz"]),
+  }),
+  z.object({
+    filename: z.string(),
+    mimeType: z.string(),
+    base64: z.string(),
+  }),
+);
+
+export const SelectProjectForConversation = registry.command(
+  "select_project",
+  z.object({
+    conversationId: z.string().min(1, "Conversation ID is required"),
+    projectId: z.string().min(1, "Project ID is required"),
+  }),
+  z.object({
+    conversationId: z.string(),
+    projectId: z.string(),
+    permissionMode: ProjectPermissionModeSchema,
+  }),
+);
+
+export const SetPermissionMode = registry.command(
+  "set_permission_mode",
+  z.object({
+    conversationId: z.string().min(1, "Conversation ID is required"),
+    permissionMode: ProjectPermissionModeSchema,
+  }),
+  z.object({
+    conversationId: z.string(),
+    projectId: z.string(),
+    permissionMode: ProjectPermissionModeSchema,
+  }),
+);
+
 // ============================================================================
 // Events (Server → Client notifications)
 // ============================================================================
@@ -86,6 +211,16 @@ export const AIResponseEvent = registry.event(
 
 export const AIResponseChunkEvent = registry.event(
   "ai_response_chunk",
+  z.object({
+    messageId: z.number(),
+    conversationId: z.string(),
+    delta: z.string(),
+    timestamp: z.string().datetime(),
+  }),
+);
+
+export const AIReasoningChunkEvent = registry.event(
+  "ai_reasoning_chunk",
   z.object({
     messageId: z.number(),
     conversationId: z.string(),
@@ -111,14 +246,27 @@ export const SystemNotificationEvent = registry.event(
 );
 
 // ============================================================================
-// Agent Tool Events (for future tool integration)
+// Agent Status Events
 // ============================================================================
+
+/**
+ * Agent processing phases for proper UI state management
+ */
+export const AgentPhaseSchema = z.enum([
+  "thinking", // AI is reasoning/thinking (may or may not have visible content)
+  "generating", // AI is generating the response text
+  "tool_use", // AI is using a tool (deep_research, etc.)
+  "stopping", // Generation is being stopped
+]);
+export type AgentPhase = z.infer<typeof AgentPhaseSchema>;
 
 export const AgentStatusUpdateEvent = registry.event(
   "agent_status_update",
   z.object({
     conversationId: z.string(),
-    status: z.string(),
+    phase: AgentPhaseSchema,
+    /** Human-readable status message (e.g., tool name, search query) */
+    message: z.string().optional(),
     timestamp: z.string().datetime(),
   }),
 );
@@ -153,6 +301,53 @@ export const SuggestAnswerChunkEvent = registry.event(
   }),
 );
 
+export const GenerationStoppedEvent = registry.event(
+  "generation_stopped",
+  z.object({
+    conversationId: z.string(),
+    messageId: z.number().optional(),
+    partialContent: z.string(),
+    timestamp: z.string().datetime(),
+  }),
+);
+
+// ============================================================================
+// Agent Questions (blocking)
+// ============================================================================
+
+export const AgentQuestionEvent = registry.event(
+  "agent_question",
+  z.object({
+    questionId: z.string(),
+    conversationId: z.string(),
+    type: z.enum(["permission", "choice", "input"]),
+    title: z.string(),
+    message: z.string(),
+    options: z
+      .array(
+        z.object({
+          id: z.string(),
+          label: z.string(),
+          inputField: z.object({ placeholder: z.string() }).optional(),
+        }),
+      )
+      .optional(),
+    timestamp: z.string().datetime(),
+  }),
+);
+
+export const AnswerAgentQuestion = registry.command(
+  "answer_agent_question",
+  z.object({
+    questionId: z.string(),
+    selectedOptionId: z.string(),
+    inputValue: z.string().optional(),
+  }),
+  z.object({
+    acknowledged: z.boolean(),
+  }),
+);
+
 // ============================================================================
 // Type Exports
 // ============================================================================
@@ -171,6 +366,7 @@ export type GetConversationsResponse = z.infer<typeof GetConversations.responseS
 
 export type AIResponsePayload = z.infer<typeof AIResponseEvent.payloadSchema>;
 export type AIResponseChunkPayload = z.infer<typeof AIResponseChunkEvent.payloadSchema>;
+export type AIReasoningChunkPayload = z.infer<typeof AIReasoningChunkEvent.payloadSchema>;
 export type ConversationUpdatedPayload = z.infer<typeof ConversationUpdatedEvent.payloadSchema>;
 export type SystemNotificationPayload = z.infer<typeof SystemNotificationEvent.payloadSchema>;
 
@@ -178,3 +374,22 @@ export type AgentStatusUpdatePayload = z.infer<typeof AgentStatusUpdateEvent.pay
 export type ChatAgentErrorPayload = z.infer<typeof ChatAgentErrorEvent.payloadSchema>;
 export type BackgroundTaskErrorPayload = z.infer<typeof BackgroundTaskErrorEvent.payloadSchema>;
 export type SuggestAnswerChunkPayload = z.infer<typeof SuggestAnswerChunkEvent.payloadSchema>;
+
+export type StopGenerationRequest = z.infer<typeof StopGeneration.requestSchema>;
+export type StopGenerationResponse = z.infer<typeof StopGeneration.responseSchema>;
+export type GenerationStoppedPayload = z.infer<typeof GenerationStoppedEvent.payloadSchema>;
+
+export type Project = z.infer<typeof ProjectSchema>;
+export type ProjectFile = z.infer<typeof ProjectFileSchema>;
+export type CreateProjectRequest = z.infer<typeof CreateProject.requestSchema>;
+export type CreateProjectResponse = z.infer<typeof CreateProject.responseSchema>;
+export type GetProjectsResponse = z.infer<typeof GetProjects.responseSchema>;
+export type GetProjectFilesResponse = z.infer<typeof GetProjectFiles.responseSchema>;
+export type ReadProjectFileResponse = z.infer<typeof ReadProjectFile.responseSchema>;
+export type ExportProjectResponse = z.infer<typeof ExportProject.responseSchema>;
+export type SelectProjectForConversationResponse = z.infer<
+  typeof SelectProjectForConversation.responseSchema
+>;
+export type SetPermissionModeResponse = z.infer<typeof SetPermissionMode.responseSchema>;
+export type AgentQuestionPayload = z.infer<typeof AgentQuestionEvent.payloadSchema>;
+export type AnswerAgentQuestionRequest = z.infer<typeof AnswerAgentQuestion.requestSchema>;

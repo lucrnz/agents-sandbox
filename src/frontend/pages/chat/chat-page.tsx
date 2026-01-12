@@ -1,36 +1,55 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useParams, useLocation } from "wouter";
 import { Button } from "@/frontend/components/ui/button";
-import { ArrowUp, Zap, Square } from "lucide-react";
+import {
+  ArrowUp,
+  Zap,
+  Square,
+  ChevronDown,
+  ChevronRight,
+  Brain,
+  Sparkles,
+  Loader2,
+} from "lucide-react";
 import { Textarea } from "@/frontend/components/ui/textarea";
 import { useWebSocket } from "@/frontend/hooks/useWebSocket";
 import ConversationSidebar from "@/frontend/components/conversation-sidebar";
 import { MarkdownRenderer } from "@/frontend/components/markdown-renderer";
 import { ToolSelector } from "@/frontend/components/tool-selector";
+import { ProjectsSidebar } from "@/frontend/components/projects-sidebar";
+import { AgentQuestionDialog } from "@/frontend/components/agent-question-dialog";
 import { toast } from "sonner";
 import {
   SendMessage,
   LoadConversation,
   GetConversations,
   SuggestAnswer,
+  StopGeneration,
+  AgentQuestionEvent,
   AIResponseEvent,
   AIResponseChunkEvent,
+  AIReasoningChunkEvent,
   ConversationUpdatedEvent,
   SystemNotificationEvent,
   AgentStatusUpdateEvent,
   ChatAgentErrorEvent,
   BackgroundTaskErrorEvent,
   SuggestAnswerChunkEvent,
+  GenerationStoppedEvent,
+  type AgentQuestionPayload,
   type AIResponsePayload,
   type AIResponseChunkPayload,
+  type AIReasoningChunkPayload,
   type ConversationUpdatedPayload,
   type SystemNotificationPayload,
   type AgentStatusUpdatePayload,
   type ChatAgentErrorPayload,
   type BackgroundTaskErrorPayload,
   type SuggestAnswerChunkPayload,
+  type GenerationStoppedPayload,
   type ToolName,
   type Conversation,
+  type AgentPhase,
 } from "@/shared/commands";
 import {
   Dialog,
@@ -74,6 +93,7 @@ interface Message {
   id?: number;
   sender: "user" | "assistant" | "system";
   text: string;
+  reasoning?: string;
   timestamp: string;
   toolInfo?: {
     toolName: string;
@@ -88,16 +108,21 @@ interface Message {
 }
 
 export default function ChatPage() {
+  const [, navigate] = useLocation();
+  const params = useParams<{ conversationId?: string }>();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [loadingStatus, setLoadingStatus] = useState<string>("Thinking...");
+  const [loadingPhase, setLoadingPhase] = useState<AgentPhase>("thinking");
+  const [loadingMessage, setLoadingMessage] = useState<string | undefined>();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<string>();
   const [currentConversationTitle, setCurrentConversationTitle] = useState("New Chat");
   const [lastFailedMessage, setLastFailedMessage] = useState<string>("");
   const [hasAgentError, setHasAgentError] = useState(false);
   const [selectedTools, setSelectedTools] = useState<ToolName[]>([]);
+  const [expandedReasoning, setExpandedReasoning] = useState<Set<number>>(new Set());
+  const [pendingQuestion, setPendingQuestion] = useState<AgentQuestionPayload | undefined>();
 
   // Random greeting - memoized to stay consistent during session
   const greeting = useMemo(() => GREETINGS[Math.floor(Math.random() * GREETINGS.length)], []);
@@ -158,8 +183,8 @@ export default function ChatPage() {
     });
 
     const unsubAIResponseChunk = on<AIResponseChunkPayload>(AIResponseChunkEvent, (payload) => {
-      // Switch status to generating as soon as we get chunks
-      setLoadingStatus("Generating...");
+      // Switch phase to generating as soon as we get text chunks
+      setLoadingPhase("generating");
 
       setMessages((prev) => {
         const existingIndex = prev.findIndex((m) => m.id === payload.messageId);
@@ -189,6 +214,41 @@ export default function ChatPage() {
         return [...prev, newMessage];
       });
       // We keep isLoading true while chunks are coming
+    });
+
+    const unsubAIReasoningChunk = on<AIReasoningChunkPayload>(AIReasoningChunkEvent, (payload) => {
+      // Keep phase as thinking while reasoning
+      setLoadingPhase("thinking");
+
+      setMessages((prev) => {
+        const existingIndex = prev.findIndex((m) => m.id === payload.messageId);
+        if (existingIndex !== -1) {
+          const newMessages = [...prev];
+          const existingMessage = newMessages[existingIndex];
+          if (existingMessage) {
+            // Clear "🤔 Thinking..." placeholder when we start getting reasoning
+            const currentText =
+              existingMessage.text === "🤔 Thinking..." ? "" : existingMessage.text;
+            newMessages[existingIndex] = {
+              ...existingMessage,
+              text: currentText,
+              reasoning: (existingMessage.reasoning || "") + payload.delta,
+              timestamp: payload.timestamp,
+            };
+            return newMessages;
+          }
+        }
+
+        // First reasoning chunk for this message
+        const newMessage: Message = {
+          id: payload.messageId,
+          sender: "assistant",
+          text: "",
+          reasoning: payload.delta,
+          timestamp: payload.timestamp,
+        };
+        return [...prev, newMessage];
+      });
     });
 
     const unsubConversationUpdated = on<ConversationUpdatedPayload>(
@@ -221,7 +281,8 @@ export default function ChatPage() {
       AgentStatusUpdateEvent,
       (payload) => {
         if (payload.conversationId === currentConversationId) {
-          setLoadingStatus(payload.status);
+          setLoadingPhase(payload.phase);
+          setLoadingMessage(payload.message);
           setIsLoading(true);
         }
       },
@@ -273,15 +334,50 @@ export default function ChatPage() {
       },
     );
 
+    const unsubGenerationStopped = on<GenerationStoppedPayload>(
+      GenerationStoppedEvent,
+      (payload) => {
+        if (payload.conversationId === currentConversationId) {
+          // Update the message with the stopped content
+          setMessages((prev) => {
+            const existingIndex = prev.findIndex((m) => m.id === payload.messageId);
+            if (existingIndex !== -1) {
+              const newMessages = [...prev];
+              const existingMessage = newMessages[existingIndex];
+              if (existingMessage) {
+                newMessages[existingIndex] = {
+                  ...existingMessage,
+                  text: payload.partialContent,
+                  timestamp: payload.timestamp,
+                };
+                return newMessages;
+              }
+            }
+            return prev;
+          });
+          setIsLoading(false);
+        }
+      },
+    );
+
+    const unsubAgentQuestion = on<AgentQuestionPayload>(AgentQuestionEvent, (payload) => {
+      if (payload.conversationId === currentConversationId) {
+        setPendingQuestion(payload);
+      }
+    });
+
     return () => {
       unsubAIResponse();
       unsubAIResponseChunk();
+      unsubAIReasoningChunk();
       unsubConversationUpdated();
       unsubSystemNotification();
       unsubAgentStatusUpdate();
       unsubChatAgentError();
       unsubBackgroundTaskError();
       unsubSuggestAnswerChunk();
+      unsubGenerationStopped();
+      unsubAgentQuestion();
     };
   }, [on, currentConversationId, isAutoAnswerMode, isGeneratingSuggestion]);
 
@@ -386,7 +482,8 @@ export default function ChatPage() {
       if (!messageContent) {
         setInputMessage("");
       }
-      setLoadingStatus("Thinking...");
+      setLoadingPhase("thinking");
+      setLoadingMessage(undefined);
       setIsLoading(true);
       setHasAgentError(false);
 
@@ -473,8 +570,15 @@ export default function ChatPage() {
         console.error("Failed to load conversation:", error);
       }
     },
-    [send],
+    [send, navigate],
   );
+
+  // Load conversation from URL parameter
+  useEffect(() => {
+    if (isConnected && params.conversationId && params.conversationId !== currentConversationId) {
+      handleLoadConversation(params.conversationId);
+    }
+  }, [isConnected, params.conversationId, currentConversationId, handleLoadConversation]);
 
   const handleRetryMessage = useCallback(async () => {
     if (!lastFailedMessage.trim()) return;
@@ -487,7 +591,8 @@ export default function ChatPage() {
 
     setMessages((prev) => [...prev, userMessage]);
     setLastFailedMessage("");
-    setLoadingStatus("Thinking...");
+    setLoadingPhase("thinking");
+    setLoadingMessage(undefined);
     setIsLoading(true);
     setHasAgentError(false);
 
@@ -533,6 +638,28 @@ export default function ChatPage() {
       ]);
     }
   }, [lastFailedMessage, currentConversationId, send]);
+
+  const handleStopGeneration = useCallback(async () => {
+    if (!currentConversationId || !isLoading) return;
+
+    try {
+      setLoadingPhase("stopping");
+      const result = await send(StopGeneration, {
+        conversationId: currentConversationId,
+      });
+
+      if (result.stopped) {
+        console.log("Generation stopped successfully");
+        // The GenerationStoppedEvent will handle updating the UI
+      } else {
+        console.log("No active generation to stop");
+        setIsLoading(false);
+      }
+    } catch (error) {
+      console.error("Failed to stop generation:", error);
+      setIsLoading(false);
+    }
+  }, [currentConversationId, isLoading, send]);
 
   // ============================================================================
   // Auto-Answer Functions
@@ -667,6 +794,18 @@ export default function ChatPage() {
   // Status Display
   // ============================================================================
 
+  const toggleReasoningExpanded = useCallback((messageId: number) => {
+    setExpandedReasoning((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(messageId)) {
+        newSet.delete(messageId);
+      } else {
+        newSet.add(messageId);
+      }
+      return newSet;
+    });
+  }, []);
+
   const getStatusDisplay = () => {
     switch (connectionState) {
       case "connected":
@@ -747,16 +886,26 @@ export default function ChatPage() {
                       className="max-h-[120px] min-h-[40px] flex-1 resize-none"
                       rows={1}
                     />
-                    <Button
-                      onClick={() => handleSendMessage()}
-                      disabled={
-                        !isConnected || isLoading || !inputMessage.trim() || isAutoAnswerMode
-                      }
-                      className="h-10 w-10 rounded-full p-2"
-                      aria-label="Send"
-                    >
-                      <ArrowUp className="h-4 w-4" />
-                    </Button>
+                    {isLoading ? (
+                      <Button
+                        onClick={handleStopGeneration}
+                        disabled={!isConnected}
+                        variant="destructive"
+                        className="h-10 w-10 rounded-full p-2"
+                        aria-label="Stop"
+                      >
+                        <Square className="h-4 w-4" />
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={() => handleSendMessage()}
+                        disabled={!isConnected || !inputMessage.trim() || isAutoAnswerMode}
+                        className="h-10 w-10 rounded-full p-2"
+                        aria-label="Send"
+                      >
+                        <ArrowUp className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -795,7 +944,52 @@ export default function ChatPage() {
                         }`}
                       >
                         {message.sender === "assistant" ? (
-                          <MarkdownRenderer content={message.text} />
+                          <>
+                            {/* Reasoning section - collapsible */}
+                            {message.reasoning && (
+                              <div className="mb-3">
+                                <button
+                                  onClick={() => message.id && toggleReasoningExpanded(message.id)}
+                                  className="text-muted-foreground hover:text-foreground mb-2 flex items-center gap-1 text-sm transition-colors"
+                                >
+                                  {message.id && expandedReasoning.has(message.id) ? (
+                                    <ChevronDown className="h-4 w-4" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4" />
+                                  )}
+                                  <Brain className="h-4 w-4" />
+                                  <span>
+                                    Thinking
+                                    {isLoading &&
+                                      messages[messages.length - 1]?.id === message.id &&
+                                      !message.text &&
+                                      "..."}
+                                  </span>
+                                </button>
+                                {message.id && expandedReasoning.has(message.id) && (
+                                  <div className="border-muted-foreground/30 text-muted-foreground ml-5 border-l-2 pl-3 text-sm">
+                                    <MarkdownRenderer content={message.reasoning} />
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            {/* Main response */}
+                            {message.text === "🤔 Thinking..." ? (
+                              <div className="text-muted-foreground flex animate-pulse items-center gap-2">
+                                <Brain className="h-4 w-4" />
+                                <span className="text-sm font-medium">Thinking...</span>
+                              </div>
+                            ) : (
+                              message.text && <MarkdownRenderer content={message.text} />
+                            )}
+                            {/* Show placeholder if no content yet */}
+                            {!message.text && !message.reasoning && (
+                              <div className="text-muted-foreground flex animate-pulse items-center gap-2">
+                                <Brain className="h-4 w-4" />
+                                <span className="text-sm font-medium">Thinking...</span>
+                              </div>
+                            )}
+                          </>
                         ) : (
                           <>
                             <MarkdownRenderer content={message.text} />
@@ -826,9 +1020,28 @@ export default function ChatPage() {
                     </div>
                   ))}
                   {isLoading && (
-                    <div className="flex justify-center">
-                      <div className="text-foreground max-w-2xl p-4 xl:max-w-3xl">
-                        <p>{loadingStatus}</p>
+                    <div className="flex justify-center py-2">
+                      <div className="bg-muted/50 border-muted-foreground/10 flex items-center gap-2.5 rounded-full border px-4 py-1.5 shadow-sm backdrop-blur-sm">
+                        {loadingPhase === "thinking" ? (
+                          <Brain className="text-primary h-3.5 w-3.5 animate-pulse" />
+                        ) : loadingPhase === "generating" ? (
+                          <Sparkles className="text-primary h-3.5 w-3.5 animate-pulse" />
+                        ) : loadingPhase === "stopping" ? (
+                          <Square className="text-destructive h-3.5 w-3.5 animate-pulse" />
+                        ) : (
+                          <Loader2 className="text-primary h-3.5 w-3.5 animate-spin" />
+                        )}
+                        <span className="text-muted-foreground text-xs font-medium">
+                          {loadingPhase === "thinking"
+                            ? "Thinking..."
+                            : loadingPhase === "generating"
+                              ? "Generating..."
+                              : loadingPhase === "stopping"
+                                ? "Stopping..."
+                                : loadingPhase === "tool_use"
+                                  ? loadingMessage || "Using tools..."
+                                  : "Processing..."}
+                        </span>
                       </div>
                     </div>
                   )}
@@ -899,16 +1112,26 @@ export default function ChatPage() {
                       className="max-h-[120px] min-h-[40px] flex-1 resize-none"
                       rows={1}
                     />
-                    <Button
-                      onClick={() => handleSendMessage()}
-                      disabled={
-                        !isConnected || isLoading || !inputMessage.trim() || isAutoAnswerMode
-                      }
-                      className="h-10 w-10 rounded-full p-2"
-                      aria-label="Send"
-                    >
-                      <ArrowUp className="h-4 w-4" />
-                    </Button>
+                    {isLoading ? (
+                      <Button
+                        onClick={handleStopGeneration}
+                        disabled={!isConnected || isAutoAnswerMode}
+                        variant="destructive"
+                        className="h-10 w-10 rounded-full p-2"
+                        aria-label="Stop"
+                      >
+                        <Square className="h-4 w-4" />
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={() => handleSendMessage()}
+                        disabled={!isConnected || !inputMessage.trim() || isAutoAnswerMode}
+                        className="h-10 w-10 rounded-full p-2"
+                        aria-label="Send"
+                      >
+                        <ArrowUp className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               </>
@@ -916,6 +1139,18 @@ export default function ChatPage() {
           </div>
         </div>
       </div>
+
+      <ProjectsSidebar
+        isConnected={isConnected}
+        conversationId={currentConversationId}
+        send={send}
+      />
+
+      <AgentQuestionDialog
+        question={pendingQuestion}
+        send={send}
+        onAnswered={() => setPendingQuestion(undefined)}
+      />
 
       {/* Auto-answer instructions dialog */}
       <Dialog open={isInstructionsDialogOpen} onOpenChange={setIsInstructionsDialogOpen}>
