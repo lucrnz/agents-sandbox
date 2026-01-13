@@ -1,7 +1,9 @@
 ## Project Overview
-"AI Command Center" - A meta-app designed as a controlled sandbox for training AI agents to interact with UI elements. A simulated digital environment where agents learn multi-step reasoning, action planning, and tool use in a safe, predictable space.
+
+"Super Chat" - A multi-modal AI chat application that enables conversational AI interactions with advanced tools including web research, filesystem operations, and code execution.
 
 ## Documentation Structure
+
 ### Root Directory Markdown Files
 
 The root directory contains these primary markdown files:
@@ -12,11 +14,13 @@ The root directory contains these primary markdown files:
 4. **GEMINI.md** - Symbolic link for Antigravity and Gemini CLI
 
 ### CLAUDE.md
+
 **CLAUDE.md** is exclusively for the Claude Code CLI tool. It must always be a **symbolic link** to AGENTS.md, not a separate file:
 
 **Never** edit CLAUDE.md directly - it should always point to AGENTS.md so both human and AI agents see consistent documentation.
 
 ### GEMINI.md
+
 **GEMINI.md** is for **Antigravity** and for the **Gemini CLI** tool. Like CLAUDE.md, it must always be a **symbolic link** to AGENTS.md, not a separate file:
 
 **Never** edit GEMINI.md directly - it should always point to AGENTS.md so both human and AI agents see consistent documentation.
@@ -28,17 +32,19 @@ All documentation intended for AI agents (implementation guides, architecture de
 **Examples:**
 
 - `.llm/docs/IMPLEMENTATION_GUIDES.md` - Technical implementation details for agents
-- `.llm/docs/ARCHITECTURE_DECISIONS.md` - Architecture rationale and decisions  
+- `.llm/docs/ARCHITECTURE_DECISIONS.md` - Architecture rationale and decisions
 - `.llm/docs/DEPLOYMENT_PROCEDURES.md` - Deployment and operational procedures
 
 **Keep the root clean** - Only AGENTS.md, README.md, and the CLAUDE.md/GEMINI.md symlinks belong in the root directory.
 
 ## Implementation Plans
+
 IMPORTANT: If the user didn't ask for a plan, do not create it.
 
 Plans break down large tasks into executable steps with clear context, affected files, testing strategies, and potential risks.
 
 Quick Reference:
+
 - **Create plan:** `.llm/plans/PLAN_YYYYMMdd_DESCRIPTION.md`
 - **Execute:** Follow steps sequentially, mark completed with `[x]`
 - **Complete:** Move to `.llm/plans/done/` when finished
@@ -88,6 +94,7 @@ bun run build.ts --outdir=dist --minify --sourcemap=linked --external=react,reac
 - **Environment variables** - Auto-loaded from `.env`, no dotenv needed
 
 ## WebSocket Command System
+
 ### Architecture
 
 The app uses a typed WebSocket command system for client-server communication:
@@ -110,8 +117,12 @@ The app uses a typed WebSocket command system for client-server communication:
 ```typescript
 export const MyCommand = registry.command(
   "my_command",
-  z.object({ /* request schema */ }),
-  z.object({ /* response schema */ })
+  z.object({
+    /* request schema */
+  }),
+  z.object({
+    /* response schema */
+  }),
 );
 ```
 
@@ -121,7 +132,9 @@ export const MyCommand = registry.command(
 commandHandlers.register(MyCommand, async (payload, context) => {
   const { ws, conversationId } = context;
   // Implementation
-  return { /* response */ };
+  return {
+    /* response */
+  };
 });
 ```
 
@@ -129,7 +142,9 @@ commandHandlers.register(MyCommand, async (payload, context) => {
 
 ```typescript
 const { sendCommand } = useWebSocket();
-const result = await sendCommand("my_command", { /* payload */ });
+const result = await sendCommand("my_command", {
+  /* payload */
+});
 ```
 
 ## Database Schema
@@ -196,6 +211,7 @@ bunx --bun shadcn@latest add [component-name]
 ```
 
 Example:
+
 ```bash
 bunx --bun shadcn@latest add accordion
 ```
@@ -285,6 +301,7 @@ import { cn } from "../lib/utils";
 ```
 
 ## Unit Testing
+
 ### Test Stack
 
 - **Bun Test Runner** - Bun's built-in Jest-compatible test runner
@@ -376,6 +393,7 @@ bun test go-lib-ffi.integration.test.ts
 ```
 
 **Key features:**
+
 - Uses `describe.skipIf(!libExists)` to gracefully skip when `.dylib` is not built
 - Tests all FFI functions: `cleanHTML`, `convertToMarkdown`, `parseSearchResults`, `stripMarkdown`, `getVersion`
 - Validates library loading and singleton pattern
@@ -387,6 +405,7 @@ bun test go-lib-ffi.integration.test.ts
 High-performance Go library that provides HTML processing, HTML-to-markdown conversion, and search result parsing via FFI (Foreign Function Interface).
 
 **Performance improvements:**
+
 - 2-5x faster HTML processing
 - 50-70% less memory usage for large documents
 
@@ -431,44 +450,50 @@ make clean        # Remove build artifacts
 
 ## Important Gotchas
 
-1. **Don't start server unless explicitly asked** - The backend server should only be started when the user requests it
+- **Don't start server unless explicitly asked** - The backend server should only be started when the user requests it
 
-2. **Bun vs Node.js** - Always use Bun commands, not Node.js equivalents
-   - ✅ `bun --hot src/backend/index.ts`
-   - ❌ `node src/backend/index.ts`
-   - ✅ `bun install`
-   - ❌ `npm install`
+- **Bun vs Node.js** - Always use Bun commands, not Node.js equivalents
+  - ✅ `bun --hot src/backend/index.ts`
+  - ❌ `node src/backend/index.ts`
+  - ✅ `bun install`
+  - ❌ `npm install`
 
-3. **Hot reloading** - Bun HMR preserves `import.meta.hot.data` between reloads
+- **Hot reloading** - Bun HMR preserves `import.meta.hot.data` between reloads
 
-4. **WebSocket context** - WebSocket data (`ws.data.conversationId`) persists per connection
+- **WebSocket context** - WebSocket data (`ws.data.conversationId`) persists per connection
 
-5. **Async generators** - AI responses use async generators for streaming: `async* generateResponse()`
+- **Async generators** - AI responses use async generators for streaming: `async* generateResponse()`
 
-6. **Schema validation** - All WebSocket messages validated with Zod schemas
+- **Schema validation** - All WebSocket messages validated with Zod schemas
 
-7. **Database migrations** - Use Drizzle Kit, manual schema updates in `src/backend/db/schema.ts`
+- **Database migrations** - Use Drizzle Kit, manual schema updates in `src/backend/db/schema.ts`
 
-8. **Agent status detection** - Frontend detects agent tool usage via keyword matching in response chunks
+- **better-sqlite3** - Only used by drizzle-kit CLI tools. Never use as a database connector - the app uses `bun:sqlite` instead.
 
-9. **Component variants** - Use cva for component variants, never duplicate class strings
+- **Agent status detection** - Frontend detects agent tool usage via keyword matching in response chunks
 
-10. **CSS imports** - Import CSS directly in TSX files, Bun handles bundling
+- **Component variants** - Use cva for component variants, never duplicate class strings
 
-11. **UI Components** - **NEVER** install or use Radix UI primitives directly (e.g., `@radix-ui/react-dialog`). **ALWAYS** use the corresponding shadcn/ui component (e.g., `src/frontend/components/ui/dialog.tsx`). If a component is missing, ask the user to add it.
+- **CSS imports** - Import CSS directly in TSX files, Bun handles bundling
+
+- **UI Components** - **NEVER** install or use Radix UI primitives directly (e.g., `@radix-ui/react-dialog`). **ALWAYS** use the corresponding shadcn/ui component (e.g., `src/frontend/components/ui/dialog.tsx`). If a component is missing, ask the user to add it.
 
 ## Debugging Tips
+
 ### Backend
+
 - Console logs prefixed with `[COMMAND_HANDLER]`, `[CHAT_AGENT]`, etc.
 - WebSocket messages logged for debugging
 - AI tool execution status updates streamed
 
 ### Frontend
+
 - React DevTools supported
 - WebSocket connection state in `useWebSocket` hook
 - Component hot reloading preserves state when possible
 
 ### Database
+
 - SQLite DB file location in `.env` (`DB_FILE_NAME`)
 - Use Drizzle Studio for GUI inspection: `bunx drizzle-kit studio`
 - All queries in `src/backend/db/queries.ts`
