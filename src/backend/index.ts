@@ -7,11 +7,7 @@ import {
   createCommandError,
 } from "@/shared/command-system";
 import { commandHandlers } from "./command-handlers";
-import { runMigrations } from "@/backend/db/migrate";
 import { getDockerManager, questionRegistry } from "@/backend/services/coder-runtime";
-
-// Ensure DB schema is up-to-date before serving.
-await runMigrations();
 
 // Start periodic cleanup of expired containers
 setInterval(() => {
