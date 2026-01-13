@@ -18,6 +18,8 @@ import {
   ensureDefaultProject,
   getConversationProject,
   setConversationProject,
+  listProjects,
+  createProject,
 } from "@/backend/db";
 import { ChatAgent } from "@/backend/agent/chat-agent";
 import { CoderAgent } from "@/backend/agent/coder-agent";
@@ -296,14 +298,52 @@ export class ChatOrchestrator {
     let permissionMode = (existing?.permissionMode as "ask" | "yolo") || "ask";
 
     if (!projectId) {
-      const def = await ensureDefaultProject();
-      if (!def) {
-        throw new Error("Failed to ensure default project exists");
+      // Fetch existing projects to let user choose
+      const projects = await listProjects();
+
+      const options = projects.map((p) => ({
+        id: p.id,
+        label: p.name,
+      }));
+
+      options.push({
+        id: "create_new",
+        label: "Create new project",
+        // @ts-expect-error - inputField is valid but might need type refinement in shared schemas
+        inputField: { placeholder: "Project name (optional)" },
+      });
+
+      // Emit status update so user knows we are waiting
+      this.emitEvent(AgentStatusUpdateEvent.name, {
+        conversationId: this.conversationId,
+        phase: "tool_use",
+        message: "Waiting for project selection...",
+        timestamp: new Date().toISOString(),
+      });
+
+      const { answer } = await questionRegistry.ask({
+        conversationId: this.conversationId,
+        question: {
+          type: "choice",
+          title: "Select Project",
+          message:
+            "No project is linked to this conversation. Which project would you like to use for files and container operations?",
+          options,
+        },
+        emit: (eventName: string, payload: any) => this.emitEvent(eventName, payload),
+      });
+
+      if (answer.selectedOptionId === "create_new") {
+        const name = answer.inputValue?.trim() || `Project ${new Date().toLocaleDateString()}`;
+        const newProj = await createProject({ name });
+        projectId = newProj.id;
+      } else {
+        projectId = answer.selectedOptionId;
       }
 
       const saved = await setConversationProject({
         conversationId: this.conversationId,
-        projectId: def.id,
+        projectId,
         permissionMode,
       });
 
