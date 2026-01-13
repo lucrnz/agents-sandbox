@@ -179,7 +179,10 @@ export class GoLibFFIWrapper {
   public cleanHTML(html: string): string {
     try {
       const buffer = Buffer.from(html + "\0");
-      return this.withStringResult(() => (this.lib!.symbols.CleanHTML as any)(buffer));
+      type CleanHTMLFn = (buffer: Buffer) => CString;
+      return this.withStringResult(() =>
+        (this.lib!.symbols.CleanHTML as unknown as CleanHTMLFn)(buffer),
+      );
     } catch (error) {
       console.error("[GO_LIB_FFI] Error in cleanHTML:", error);
       throw error;
@@ -189,7 +192,10 @@ export class GoLibFFIWrapper {
   public convertToMarkdown(html: string): string {
     try {
       const buffer = Buffer.from(html + "\0");
-      return this.withStringResult(() => (this.lib!.symbols.ConvertHTMLToMarkdown as any)(buffer));
+      type ConvertFn = (buffer: Buffer) => CString;
+      return this.withStringResult(() =>
+        (this.lib!.symbols.ConvertHTMLToMarkdown as unknown as ConvertFn)(buffer),
+      );
     } catch (error) {
       console.error("[GO_LIB_FFI] Error in convertToMarkdown:", error);
       throw error;
@@ -199,8 +205,9 @@ export class GoLibFFIWrapper {
   public parseSearchResults(html: string, maxResults: number = 20): SearchResult[] {
     try {
       const buffer = Buffer.from(html + "\0");
+      type ParseFn = (buffer: Buffer, maxResults: number) => CString;
       const result = this.withStringResult(
-        () => (this.lib!.symbols.ParseSearchResults as any)(buffer, maxResults),
+        () => (this.lib!.symbols.ParseSearchResults as unknown as ParseFn)(buffer, maxResults),
         "[]",
       );
 
@@ -240,7 +247,10 @@ export class GoLibFFIWrapper {
   public stripMarkdown(markdown: string): string {
     try {
       const buffer = Buffer.from(markdown + "\0");
-      return this.withStringResult(() => (this.lib!.symbols.StripMarkdown as any)(buffer));
+      type StripFn = (buffer: Buffer) => CString;
+      return this.withStringResult(() =>
+        (this.lib!.symbols.StripMarkdown as unknown as StripFn)(buffer),
+      );
     } catch (error) {
       console.error("[GO_LIB_FFI] Error in stripMarkdown:", error);
       throw error;
@@ -253,7 +263,11 @@ export class GoLibFFIWrapper {
     }
 
     try {
-      return this.withStringResult(() => (this.lib!.symbols.GetLibraryVersion as any)(), "unknown");
+      type VersionFn = () => CString;
+      return this.withStringResult(
+        () => (this.lib!.symbols.GetLibraryVersion as unknown as VersionFn)(),
+        "unknown",
+      );
     } catch (error) {
       console.error("[GO_LIB_FFI] Error getting version:", error);
       return "unknown";

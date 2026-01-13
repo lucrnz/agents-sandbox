@@ -174,7 +174,7 @@ describe.skipIf(!libExists)("GoLibFFI Integration", () => {
       const results = wrapper.parseSearchResults(mockSearchHTML, 10);
 
       if (results.length > 0) {
-        const result = results[0];
+        const result = results[0]!;
         expect(result).toHaveProperty("title");
         expect(result).toHaveProperty("link");
         expect(result).toHaveProperty("snippet");

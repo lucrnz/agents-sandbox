@@ -10,6 +10,7 @@ import {
   GenerationStoppedEvent,
   type ToolName,
 } from "@/shared/commands";
+import type { ToolCallCallback } from "@/shared/tool-types";
 import {
   addMessage,
   updateMessage,
@@ -37,10 +38,10 @@ export type ChatOrchestratorContext = {
 };
 
 export class ChatOrchestrator {
-  private ws: ServerWebSocket<{ conversationId?: string }>;
-  private conversationId: string;
-  private selectedTools?: ToolName[];
-  private taskTracker: BackgroundTaskTracker;
+  private readonly ws: ServerWebSocket<{ conversationId?: string }>;
+  private readonly conversationId: string;
+  private readonly selectedTools?: ToolName[];
+  private readonly taskTracker: BackgroundTaskTracker;
 
   constructor(context: ChatOrchestratorContext) {
     this.ws = context.ws;
@@ -139,11 +140,12 @@ export class ChatOrchestrator {
       const enabled = this.selectedTools ?? [];
       const isCoderAgent = enabled.includes("filesystem") || enabled.includes("container");
 
-      const onToolCall = (toolName: string, args: any) => {
+      const onToolCall: ToolCallCallback = (toolName, args) => {
         let statusMessage = "";
 
         if (toolName === "deep_research") {
-          statusMessage = generateStatusMessage(args || null);
+          const deepResearchArgs = args as { prompt: string; url?: string } | null;
+          statusMessage = generateStatusMessage(deepResearchArgs);
         } else if (toolName === "bash") {
           statusMessage = "Running a container command...";
         } else if (toolName === "write_file" || toolName === "edit_file") {
@@ -290,7 +292,7 @@ export class ChatOrchestrator {
 
   private async createCoderAgent(input: {
     enabledTools: ToolName[];
-    onToolCall: (toolName: string, args: any) => void;
+    onToolCall: ToolCallCallback;
     onCriticalError: (error: Error, originalError?: string) => void;
   }) {
     const existing = await getConversationProject(this.conversationId);
@@ -330,7 +332,7 @@ export class ChatOrchestrator {
             "No project is linked to this conversation. Which project would you like to use for files and container operations?",
           options,
         },
-        emit: (eventName: string, payload: any) => this.emitEvent(eventName, payload),
+        emit: (eventName: string, payload: unknown) => this.emitEvent(eventName, payload),
       });
 
       if (answer.selectedOptionId === "create_new") {
@@ -369,7 +371,7 @@ export class ChatOrchestrator {
         const { answer } = await questionRegistry.ask({
           conversationId: this.conversationId,
           question,
-          emit: (eventName: string, payload: any) => this.emitEvent(eventName, payload),
+          emit: (eventName: string, payload: unknown) => this.emitEvent(eventName, payload),
         });
         return answer;
       },
@@ -382,7 +384,7 @@ export class ChatOrchestrator {
   /**
    * Helper to emit WebSocket events
    */
-  private emitEvent(eventName: string, payload: any) {
+  private emitEvent(eventName: string, payload: unknown) {
     const event = createEventMessage(eventName, payload);
     this.ws.send(JSON.stringify(event));
   }
@@ -390,7 +392,7 @@ export class ChatOrchestrator {
   /**
    * Handles errors by adding an error message and notifying the client
    */
-  private async handleError(error: any) {
+  private async handleError(error: unknown) {
     try {
       const errorMessage =
         "❌ Sorry, I encountered an error while processing your request. Please try again.";

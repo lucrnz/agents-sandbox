@@ -1,11 +1,19 @@
 import Dockerode from "dockerode";
 import type { Container } from "dockerode";
 import archiver from "archiver";
-import { PassThrough } from "stream";
+import { PassThrough, type Readable } from "stream";
 import * as tarStream from "tar-stream";
 import { ProjectService } from "@/backend/services/project-service";
 
 type ConversationId = string;
+
+interface DockerModem {
+  demuxStream: (source: Readable, stdout: PassThrough, stderr: PassThrough) => void;
+}
+
+interface ContainerWithModem {
+  modem?: DockerModem;
+}
 
 type ManagedContainer = {
   container: Container;
@@ -66,7 +74,7 @@ async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
 }
 
 export class DockerManager {
-  private docker: Dockerode;
+  private readonly docker: Dockerode;
   private containers = new Map<ConversationId, ManagedContainer>();
   private projectService = new ProjectService();
 
@@ -157,9 +165,9 @@ export class DockerManager {
 
     const stdoutStream = new PassThrough();
     const stderrStream = new PassThrough();
-    const modem = (managed.container as any).modem;
-    if (modem && typeof modem.demuxStream === "function") {
-      modem.demuxStream(stream, stdoutStream, stderrStream);
+    const containerWithModem = managed.container as ContainerWithModem;
+    if (containerWithModem.modem && typeof containerWithModem.modem.demuxStream === "function") {
+      containerWithModem.modem.demuxStream(stream, stdoutStream, stderrStream);
     } else {
       // Fallback or error if demuxStream isn't available (shouldn't happen with standard dockerode)
       // For now, just piping stream to stdout as a fallback

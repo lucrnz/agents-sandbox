@@ -60,14 +60,14 @@ describe("Database Queries", () => {
       await queries.updateConversation(c1.id, { title: "C1 Updated" });
 
       const all = await queries.getAllConversations();
-      expect(all[0].id).toBe(c1.id); // c1 was updated last
-      expect(all[1].id).toBe(c2.id);
+      expect(all[0]!.id).toBe(c1.id); // c1 was updated last
+      expect(all[1]!.id).toBe(c2.id);
     });
 
     test("should update conversation title", async () => {
       const conv = await queries.createConversation("Old Title");
       const updated = await queries.updateConversation(conv.id, { title: "New Title" });
-      expect(updated.title).toBe("New Title");
+      expect(updated!.title).toBe("New Title");
     });
 
     test("should delete a conversation", async () => {
@@ -86,15 +86,15 @@ describe("Database Queries", () => {
 
       const messages = await queries.getMessages(conv.id);
       expect(messages).toHaveLength(2);
-      expect(messages[0].role).toBe("user");
-      expect(messages[1].role).toBe("assistant");
+      expect(messages[0]!.role).toBe("user");
+      expect(messages[1]!.role).toBe("assistant");
     });
 
     test("should update a message", async () => {
       const conv = await queries.createConversation("Chat");
       const msg = await queries.addMessage(conv.id, "user", "Old content");
       const updated = await queries.updateMessage(msg.id, "New content");
-      expect(updated.content).toBe("New content");
+      expect(updated!.content).toBe("New content");
     });
 
     test("cascade delete should remove messages", async () => {

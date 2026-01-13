@@ -1,9 +1,10 @@
-import { ToolLoopAgent, stepCountIs, tool } from "ai";
+import { ToolLoopAgent, stepCountIs, tool, type Tool } from "ai";
 import { z } from "zod";
 import type { ToolName } from "@/shared/commands";
 import { bigModel } from "@/backend/agent/model-config";
 import { ProjectService, type ProjectPermissionMode } from "@/backend/services/project-service";
 import { DockerManager } from "@/backend/services/docker-manager";
+import type { ToolCallCallback, ToolResultCallback } from "@/shared/tool-types";
 
 export type AgentQuestionType = "permission" | "choice" | "input";
 
@@ -37,32 +38,35 @@ export type CoderAgentContext = {
  * This uses Vercel AI's ToolLoopAgent like the existing ChatAgent, but with
  * tools modeled after opencode-style capabilities.
  */
+interface CoderAgentInput {
+  enabledTools: ToolName[];
+  context: CoderAgentContext;
+  askUser: AskUserFn;
+  projectService?: ProjectService;
+  dockerManager?: DockerManager;
+  onToolCall?: ToolCallCallback;
+  onToolResult?: ToolResultCallback;
+  onCriticalError?: (error: Error, originalError?: string) => void;
+}
+
 export class CoderAgent {
-  private agent: ToolLoopAgent<never, any, any>;
-  private projectService: ProjectService;
-  private dockerManager?: DockerManager;
-  private askUser: AskUserFn;
-  private context: CoderAgentContext;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private readonly agent: ToolLoopAgent<never, Record<string, Tool>, any>;
+  private readonly projectService: ProjectService;
+  private readonly dockerManager?: DockerManager;
+  private readonly askUser: AskUserFn;
+  private readonly context: CoderAgentContext;
 
   private projectAccessGranted = false;
   private syncedToContainer = false;
 
-  constructor(input: {
-    enabledTools: ToolName[];
-    context: CoderAgentContext;
-    askUser: AskUserFn;
-    projectService?: ProjectService;
-    dockerManager?: DockerManager;
-    onToolCall?: (toolName: string, args: any) => void;
-    onToolResult?: (toolName: string, result: any, error?: Error) => void;
-    onCriticalError?: (error: Error, originalError?: string) => void;
-  }) {
+  constructor(input: CoderAgentInput) {
     this.context = input.context;
     this.askUser = input.askUser;
     this.projectService = input.projectService ?? new ProjectService();
     this.dockerManager = input.dockerManager;
 
-    const tools: Record<string, any> = {};
+    const tools: Record<string, Tool> = {};
     const filesystemEnabled = input.enabledTools.includes("filesystem");
     const containerEnabled = input.enabledTools.includes("container");
 

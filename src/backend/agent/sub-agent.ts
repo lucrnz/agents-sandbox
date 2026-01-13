@@ -1,10 +1,11 @@
-import type { LanguageModel } from "ai";
+import type { LanguageModel, Tool } from "ai";
 import { ToolLoopAgent, stepCountIs } from "ai";
 import { mkdir, rm } from "fs/promises";
 import { join, resolve, relative, isAbsolute } from "path";
 import { randomUUID } from "crypto";
 import { tmpdir as getOsTmpDir } from "os";
 import { MAX_SUB_AGENT_STEPS } from "./config";
+import type { ToolCallCallback, ToolResultCallback } from "@/shared/tool-types";
 
 /**
  * Sub-agent workspace configuration
@@ -21,10 +22,10 @@ export interface SubAgentWorkspace {
 export interface SubAgentConfig {
   model: LanguageModel;
   system: string;
-  tools: Record<string, any>;
+  tools: Record<string, Tool>;
   maxSteps?: number;
-  onToolCall?: (toolName: string, args: any) => void;
-  onToolResult?: (toolName: string, result: any, error?: Error) => void;
+  onToolCall?: ToolCallCallback;
+  onToolResult?: ToolResultCallback;
   onWorkspaceCreated?: (workspace: SubAgentWorkspace) => void;
 }
 
@@ -127,9 +128,10 @@ export function actualPathToVirtual(actualPath: string, workspace: SubAgentWorks
  * Sub-agent class with virtual workspace support
  */
 export class SubAgent {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private agent!: ToolLoopAgent<never, any, any>;
   private workspace: SubAgentWorkspace | null = null;
-  private config: SubAgentConfig;
+  private readonly config: SubAgentConfig;
 
   constructor(config: SubAgentConfig) {
     this.config = config;

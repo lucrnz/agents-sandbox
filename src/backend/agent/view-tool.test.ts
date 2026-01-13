@@ -32,7 +32,7 @@ describe("View Tool", () => {
     await writeFile(filePath, content);
 
     const viewTool = createViewTool(getWorkspace, { virtualPathToActual });
-    const result = await viewTool.execute({ path: "test.txt" }, { toolCallId: "1", messages: [] });
+    const result = await viewTool.execute!({ path: "test.txt" }, { toolCallId: "1", messages: [] });
 
     expect(result).toBe(content);
   });
@@ -45,7 +45,7 @@ describe("View Tool", () => {
     await writeFile(filePath, content);
 
     const viewTool = createViewTool(getWorkspace, { virtualPathToActual });
-    const result = await viewTool.execute(
+    const result = await viewTool.execute!(
       { path: "/home/agent/test.txt" },
       { toolCallId: "1", messages: [] },
     );
@@ -57,7 +57,7 @@ describe("View Tool", () => {
     const viewTool = createViewTool(getWorkspace, { virtualPathToActual });
 
     await expect(
-      viewTool.execute({ path: "non-existent.txt" }, { toolCallId: "1", messages: [] }),
+      viewTool.execute!({ path: "non-existent.txt" }, { toolCallId: "1", messages: [] }),
     ).rejects.toThrow(/Failed to read file/);
   });
 
@@ -65,7 +65,7 @@ describe("View Tool", () => {
     const viewTool = createViewTool(getWorkspace, { virtualPathToActual });
 
     await expect(
-      viewTool.execute({ path: "../outside.txt" }, { toolCallId: "1", messages: [] }),
+      viewTool.execute!({ path: "../outside.txt" }, { toolCallId: "1", messages: [] }),
     ).rejects.toThrow(/Forbidden request|Path traversal detected/);
   });
 
@@ -73,7 +73,7 @@ describe("View Tool", () => {
     const viewTool = createViewTool(() => null, { virtualPathToActual });
 
     await expect(
-      viewTool.execute({ path: "test.txt" }, { toolCallId: "1", messages: [] }),
+      viewTool.execute!({ path: "test.txt" }, { toolCallId: "1", messages: [] }),
     ).rejects.toThrow("Workspace not available");
   });
 });

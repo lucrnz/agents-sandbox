@@ -1,7 +1,9 @@
-import { afterEach } from "bun:test";
+import { afterEach, expect } from "bun:test";
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 import { cleanup } from "@testing-library/react";
-import "@testing-library/jest-dom";
+import * as matchers from "@testing-library/jest-dom/matchers";
+
+expect.extend(matchers);
 
 // Register happy-dom globals - this must happen first
 GlobalRegistrator.register();

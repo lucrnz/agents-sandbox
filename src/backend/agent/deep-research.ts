@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { tool } from "ai";
-import { SubAgent } from "./sub-agent";
+import { SubAgent, type SubAgentWorkspace } from "./sub-agent";
 import { bigModel } from "./model-config";
 import { createWebSearchTool } from "./web-search";
 import { createWebFetchTool } from "./web-fetch";
@@ -8,6 +8,7 @@ import { createViewTool } from "./view-tool";
 import { createGrepTool } from "./grep-tool";
 import { virtualPathToActual } from "./sub-agent";
 import { MAX_SUB_AGENT_STEPS } from "./config";
+import type { ToolCallCallback, ToolResultCallback } from "@/shared/tool-types";
 
 export const DeepResearchParamsSchema = z.object({
   url: z
@@ -73,10 +74,10 @@ When answering, structure your response as:
 
 Be thorough but concise. Focus on providing actionable information that directly answers the user's question.`;
 
-export type DeepResearchOptions = {
-  onSubAgentToolCall?: (toolName: string, args: any) => void;
-  onSubAgentToolResult?: (toolName: string, result: any, error?: Error) => void;
-};
+export interface DeepResearchOptions {
+  onSubAgentToolCall?: ToolCallCallback;
+  onSubAgentToolResult?: ToolResultCallback;
+}
 
 export function createDeepResearchTool(options?: DeepResearchOptions) {
   return tool({
@@ -111,7 +112,7 @@ The sub-agent autonomously:
       console.log("[DEEP_RESEARCH] MODE:", mode);
 
       // Create tools that can access the workspace
-      let currentWorkspace: any = null;
+      let currentWorkspace: SubAgentWorkspace | null = null;
 
       const getWorkspace = () => currentWorkspace;
 
@@ -132,13 +133,13 @@ The sub-agent autonomously:
           grep: grepTool,
         },
         maxSteps: MAX_SUB_AGENT_STEPS,
-        onToolCall: (toolName: string, args: any) => {
+        onToolCall: (toolName: string, args: unknown) => {
           console.log(`[DEEP_RESEARCH] Sub-agent tool call: ${toolName}`, args);
           if (options?.onSubAgentToolCall) {
             options.onSubAgentToolCall(toolName, args);
           }
         },
-        onToolResult: (toolName: string, result: any, error?: Error) => {
+        onToolResult: (toolName: string, result: unknown, error?: Error) => {
           if (error) {
             console.error(`[DEEP_RESEARCH] Sub-agent tool error: ${toolName}`, error);
           } else {

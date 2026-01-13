@@ -33,7 +33,7 @@ describe("Web Tools", () => {
             status: 200,
           }),
         ),
-      ) as any;
+      ) as unknown as typeof fetch;
 
       const result = await fetchUrlAndConvert("http://example.com");
 
@@ -51,7 +51,7 @@ describe("Web Tools", () => {
             status: 200,
           }),
         ),
-      ) as any;
+      ) as unknown as typeof fetch;
 
       const result = await fetchUrlAndConvert("http://example.com/api.json");
 
@@ -68,7 +68,7 @@ describe("Web Tools", () => {
             status: 200,
           }),
         ),
-      ) as any;
+      ) as unknown as typeof fetch;
 
       const result = await fetchUrlAndConvert("http://example.com/test.txt");
 
@@ -83,7 +83,7 @@ describe("Web Tools", () => {
             statusText: "Not Found",
           }),
         ),
-      ) as any;
+      ) as unknown as typeof fetch;
 
       await expect(fetchUrlAndConvert("http://example.com/404")).rejects.toThrow(
         "Failed to fetch URL: 404 Not Found",
@@ -99,12 +99,12 @@ describe("Web Tools", () => {
             status: 200,
           }),
         ),
-      ) as any;
+      ) as unknown as typeof fetch;
 
       const results = await searchDuckDuckGo("test query");
 
       expect(results).toHaveLength(1);
-      expect(results[0].title).toBe("Result 1");
+      expect(results[0]!.title).toBe("Result 1");
       expect(mockGoLib.parseSearchResults).toHaveBeenCalled();
     });
 
@@ -115,7 +115,7 @@ describe("Web Tools", () => {
             status: 202,
           }),
         ),
-      ) as any;
+      ) as unknown as typeof fetch;
 
       const results = await searchDuckDuckGo("test query");
       expect(results).toHaveLength(1); // Still calls parseSearchResults on 202

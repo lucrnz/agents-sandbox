@@ -224,7 +224,7 @@ export function ProjectsSidebar({
                 <span className="text-muted-foreground text-xs">Permission mode</span>
                 <Select
                   value={permissionMode}
-                  onValueChange={(v) => handlePermissionModeChange(v as any)}
+                  onValueChange={(v) => handlePermissionModeChange(v as ProjectPermissionMode)}
                 >
                   <SelectTrigger size="sm" className="w-[160px]">
                     <SelectValue />

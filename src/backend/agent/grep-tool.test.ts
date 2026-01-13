@@ -32,7 +32,7 @@ describe("Grep Tool", () => {
     await writeFile(filePath, content);
 
     const grepTool = createGrepTool(getWorkspace, { virtualPathToActual });
-    const result = await grepTool.execute(
+    const result = await grepTool.execute!(
       { path: "test.txt", pattern: "apple" },
       { toolCallId: "1", messages: [] },
     );
@@ -50,7 +50,7 @@ describe("Grep Tool", () => {
     await writeFile(filePath, content);
 
     const grepTool = createGrepTool(getWorkspace, { virtualPathToActual });
-    const result = await grepTool.execute(
+    const result = await grepTool.execute!(
       { path: "test.txt", pattern: "apple" },
       { toolCallId: "1", messages: [] },
     );
@@ -67,7 +67,7 @@ describe("Grep Tool", () => {
     await writeFile(filePath, content);
 
     const grepTool = createGrepTool(getWorkspace, { virtualPathToActual });
-    const result = await grepTool.execute(
+    const result = await grepTool.execute!(
       { path: "test.txt", pattern: "cherry" },
       { toolCallId: "1", messages: [] },
     );
@@ -79,7 +79,7 @@ describe("Grep Tool", () => {
     const grepTool = createGrepTool(getWorkspace, { virtualPathToActual });
 
     await expect(
-      grepTool.execute(
+      grepTool.execute!(
         { path: "../outside.txt", pattern: "test" },
         { toolCallId: "1", messages: [] },
       ),

@@ -63,8 +63,7 @@ class CommandHandlerRegistry {
       throw new Error(`No handler registered for command: ${commandName}`);
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const validated = registry.validateCommandRequest(commandName, payload as any);
+    const validated = registry.validateCommandRequest(commandName, payload);
     const result = await handler(validated, context);
     return result;
   }

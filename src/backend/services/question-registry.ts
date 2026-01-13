@@ -14,7 +14,7 @@ export type AgentQuestionEventPayload = {
   timestamp: string;
 };
 
-type EmitFn = (eventName: string, payload: any) => void;
+type EmitFn = (eventName: string, payload: unknown) => void;
 
 type PendingQuestion = {
   questionId: string;

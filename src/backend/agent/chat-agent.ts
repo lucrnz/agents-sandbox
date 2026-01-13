@@ -1,30 +1,30 @@
-import { ToolLoopAgent, stepCountIs } from "ai";
+import { ToolLoopAgent, stepCountIs, type Tool } from "ai";
 import { bigModel } from "./model-config.js";
 import { createDeepResearchTool } from "./deep-research.js";
 import type { ToolName } from "@/shared/commands";
+import type { ToolCallCallback, ToolResultCallback } from "@/shared/tool-types";
+
+interface ChatAgentParams {
+  enabledTools?: ToolName[];
+  onToolCall?: ToolCallCallback;
+  onToolResult?: ToolResultCallback;
+  onCriticalError?: (error: Error, originalError?: string) => void;
+}
 
 /**
  * Simple ChatAgent configuration with agentic fetch tool
  */
 export class ChatAgent {
-  private agent: ToolLoopAgent<never, any, any>;
-  private params?: {
-    onToolCall?: (toolName: string, args: any) => void;
-    onToolResult?: (toolName: string, result: any, error?: Error) => void;
-    onCriticalError?: (error: Error, originalError?: string) => void;
-  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private readonly agent: ToolLoopAgent<never, Record<string, Tool>, any>;
+  private readonly params?: ChatAgentParams;
 
-  constructor(params?: {
-    enabledTools?: ToolName[];
-    onToolCall?: (toolName: string, args: any) => void;
-    onToolResult?: (toolName: string, result: any, error?: Error) => void;
-    onCriticalError?: (error: Error, originalError?: string) => void;
-  }) {
+  constructor(params?: ChatAgentParams) {
     // Store params for use in error handling
     this.params = params;
 
     // Build tools object based on enabledTools
-    const tools: Record<string, any> = {};
+    const tools: Record<string, Tool> = {};
 
     // Include deep_research tool if enabledTools is undefined (backward compatibility) or explicitly enabled
     if (!params?.enabledTools || params.enabledTools.includes("deep_research")) {
