@@ -143,6 +143,42 @@ export class ChatOrchestrator {
       const enabled = this.selectedTools ?? [];
       const isCoderAgent = enabled.includes("filesystem") || enabled.includes("container");
 
+      const toolSummaries: string[] = [];
+
+      const formatToolSummary = (toolName: string, args: unknown): string | null => {
+        const safeArgs = args as Record<string, unknown> | null | undefined;
+
+        if (toolName === "write_file" || toolName === "edit_file") {
+          const path = typeof safeArgs?.path === "string" ? safeArgs.path : "unknown file";
+          return `Updated ${path}`;
+        }
+        if (toolName === "read_file") {
+          const path = typeof safeArgs?.path === "string" ? safeArgs.path : "project file";
+          return `Read ${path}`;
+        }
+        if (toolName === "list_files") {
+          return "Listed project files";
+        }
+        if (toolName === "grep") {
+          const pattern = typeof safeArgs?.pattern === "string" ? safeArgs.pattern : "pattern";
+          return `Searched for "${pattern}"`;
+        }
+        if (toolName === "bash") {
+          const command = typeof safeArgs?.command === "string" ? safeArgs.command : "command";
+          return `Ran command: ${command}`;
+        }
+        if (toolName === "deep_research") {
+          const deepResearchArgs = safeArgs as { prompt?: string; url?: string } | null;
+          const label = deepResearchArgs?.prompt || deepResearchArgs?.url;
+          return label ? `Researched: ${label}` : "Ran deep research";
+        }
+        if (toolName === "ask_question") {
+          return null;
+        }
+
+        return `Used tool: ${toolName}`;
+      };
+
       const onToolCall: ToolCallCallback = (toolName, args) => {
         let statusMessage = "";
 
@@ -159,10 +195,23 @@ export class ChatOrchestrator {
           statusMessage = "Waiting for your answer...";
         }
 
+        const summary = formatToolSummary(toolName, args);
+        if (summary && !toolSummaries.includes(summary)) {
+          toolSummaries.push(summary);
+        }
+
         this.emitEvent(AgentStatusUpdateEvent.name, {
           conversationId: this.conversationId,
           phase: "tool_use",
           message: statusMessage,
+          timestamp: new Date().toISOString(),
+        });
+      };
+
+      const onToolResult = () => {
+        this.emitEvent(AgentStatusUpdateEvent.name, {
+          conversationId: this.conversationId,
+          phase: "thinking",
           timestamp: new Date().toISOString(),
         });
       };
@@ -181,11 +230,16 @@ export class ChatOrchestrator {
       };
 
       const agent: ChatAgent | CoderAgent = isCoderAgent
-        ? await this.createCoderAgent({ enabledTools: enabled, onToolCall, onCriticalError })
+        ? await this.createCoderAgent({
+            enabledTools: enabled,
+            onToolCall,
+            onToolResult,
+            onCriticalError,
+          })
         : new ChatAgent({
             enabledTools: enabled,
             onToolCall,
-            onToolResult: () => {},
+            onToolResult,
             onCriticalError,
           });
 
@@ -263,6 +317,11 @@ export class ChatOrchestrator {
       }
 
       // Final cleanup - update message with complete response
+      if (!fullResponse.trim() && toolSummaries.length > 0) {
+        const summaryLines = toolSummaries.slice(0, 4).map((item) => `- ${item}`);
+        fullResponse = summaryLines.join("\n");
+      }
+
       await updateMessage(aiMessage.id, fullResponse);
 
       // Emit AI response event
@@ -293,6 +352,7 @@ export class ChatOrchestrator {
   private async createCoderAgent(input: {
     enabledTools: ToolName[];
     onToolCall: ToolCallCallback;
+    onToolResult: () => void;
     onCriticalError: (error: Error, originalError?: string) => void;
   }) {
     const existing = await getConversationProject(this.conversationId);
@@ -376,7 +436,7 @@ export class ChatOrchestrator {
         return answer;
       },
       onToolCall: input.onToolCall,
-      onToolResult: () => {},
+      onToolResult: input.onToolResult,
       onCriticalError: input.onCriticalError,
     });
   }

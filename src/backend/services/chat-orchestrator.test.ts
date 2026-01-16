@@ -5,7 +5,7 @@ import * as titleGen from "@/backend/agent/title-generation.js";
 import { ChatAgent } from "@/backend/agent/chat-agent";
 import type { ServerWebSocket } from "bun";
 import type { EventMessage } from "@/shared/command-system";
-import type { AIResponseChunkPayload } from "@/shared/commands";
+import type { AIResponseChunkPayload, AgentStatusUpdatePayload } from "@/shared/commands";
 
 describe("ChatOrchestrator", () => {
   let ws: ServerWebSocket<{ conversationId?: string }>;
@@ -136,5 +136,56 @@ describe("ChatOrchestrator", () => {
     expect(chunkEvents).toHaveLength(2);
     expect(chunkEvents[0]!.payload.delta).toBe("Hello ");
     expect(chunkEvents[1]!.payload.delta).toBe("world!");
+  });
+
+  test("emits thinking status after tool results", async () => {
+    const originalGenerateResponse = ChatAgent.prototype.generateResponse;
+    spies.push(
+      spyOn(ChatAgent.prototype, "generateResponse").mockImplementation(async function* (this: {
+        params?: { onToolResult?: () => void };
+      }) {
+        yield { type: "text" as const, content: "Done" };
+        this.params?.onToolResult?.();
+      }),
+    );
+
+    const privateOrchestrator = orchestrator as unknown as {
+      streamAIResponse: (content: string) => Promise<void>;
+    };
+
+    await privateOrchestrator.streamAIResponse("Check tools");
+
+    const sendMock = ws.send as Mock<typeof ws.send>;
+    const sentEvents = sendMock.mock.calls.map((c) => JSON.parse(c[0] as string));
+    const statusEvents = sentEvents.filter((e) => e.event === "agent_status_update") as Array<
+      EventMessage<AgentStatusUpdatePayload>
+    >;
+
+    expect(statusEvents.some((e) => e.payload.phase === "thinking")).toBe(true);
+
+    ChatAgent.prototype.generateResponse = originalGenerateResponse;
+  });
+
+  test("creates fallback summary when only tools run", async () => {
+    const generateSpy = ChatAgent.prototype.generateResponse as Mock<
+      typeof ChatAgent.prototype.generateResponse
+    >;
+
+    generateSpy.mockImplementation(async function* (this: {
+      params?: { onToolCall?: (toolName: string, args: unknown) => void };
+    }) {
+      this.params?.onToolCall?.("read_file", { path: "docs/readme.md" });
+      return;
+    });
+
+    const privateOrchestrator = orchestrator as unknown as {
+      streamAIResponse: (content: string) => Promise<void>;
+    };
+
+    await privateOrchestrator.streamAIResponse("Summarize tools");
+
+    const updateMessageMock = db.updateMessage as Mock<typeof db.updateMessage>;
+    const lastCall = updateMessageMock.mock.calls[updateMessageMock.mock.calls.length - 1];
+    expect(lastCall?.[1]).toBe("- Read docs/readme.md");
   });
 });

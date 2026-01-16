@@ -336,6 +336,11 @@ Hard rules:
 - When you use the container, treat /workspace as the project root.
 - When unsure, ask the user using ask_question.
 
+Response requirements:
+- Always end with a concise summary of what you did.
+- Keep the summary to 2-4 short bullet points.
+- No extra prose after the bullets.
+
 Current Date: ${new Date().toDateString()}
 `,
       tools,
