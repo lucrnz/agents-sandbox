@@ -5,6 +5,9 @@ import { bigModel } from "@/backend/agent/model-config";
 import { ProjectService, type ProjectPermissionMode } from "@/backend/services/project-service";
 import { DockerManager } from "@/backend/services/docker-manager";
 import type { ToolCallCallback, ToolResultCallback } from "@/shared/tool-types";
+import { createLogger } from "@/backend/logger";
+
+const logger = createLogger("backend:coder-agent");
 
 export type AgentQuestionType = "permission" | "choice" | "input";
 
@@ -381,8 +384,7 @@ Current Date: ${new Date().toDateString()}
         return;
       }
       const errorId = crypto.randomUUID();
-      // eslint-disable-next-line no-console
-      console.error(`[CODER_AGENT] Error ${errorId}:`, error);
+      logger.error({ error, errorId }, "CoderAgent error");
       yield {
         type: "text",
         content: `❌ Sorry, I encountered an error while running CoderAgent. (Ref: ${errorId.slice(0, 8)})`,

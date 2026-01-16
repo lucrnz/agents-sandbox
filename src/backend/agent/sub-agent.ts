@@ -6,6 +6,9 @@ import { randomUUID } from "crypto";
 import { tmpdir as getOsTmpDir } from "os";
 import { MAX_SUB_AGENT_STEPS } from "./config";
 import type { ToolCallCallback, ToolResultCallback } from "@/shared/tool-types";
+import { createLogger } from "@/backend/logger";
+
+const logger = createLogger("backend:sub-agent");
 
 /**
  * Sub-agent workspace configuration
@@ -37,7 +40,7 @@ export async function createSubAgentWorkspace(): Promise<SubAgentWorkspace> {
   const sessionId = randomUUID();
   const actualPath = join(tmpDir, `agents-sandbox-${sessionId}`);
 
-  console.log(`[SUB_AGENT] Creating workspace: ${actualPath}`);
+  logger.info({ actualPath }, "Creating workspace");
 
   try {
     await mkdir(actualPath, { recursive: true });
@@ -47,7 +50,7 @@ export async function createSubAgentWorkspace(): Promise<SubAgentWorkspace> {
       actualPath,
     };
   } catch (error) {
-    console.error("[SUB_AGENT] Failed to create workspace:", error);
+    logger.error({ error }, "Failed to create workspace");
     throw new Error(
       `Failed to create sub-agent workspace: ${error instanceof Error ? error.message : String(error)}`,
     );
@@ -58,13 +61,13 @@ export async function createSubAgentWorkspace(): Promise<SubAgentWorkspace> {
  * Clean up sub-agent workspace
  */
 export async function cleanupSubAgentWorkspace(workspace: SubAgentWorkspace): Promise<void> {
-  console.log(`[SUB_AGENT] Cleaning up workspace: ${workspace.actualPath}`);
+  logger.info({ actualPath: workspace.actualPath }, "Cleaning up workspace");
 
   try {
     await rm(workspace.actualPath, { recursive: true, force: true });
-    console.log("[SUB_AGENT] Workspace cleaned up successfully");
+    logger.info("Workspace cleaned up successfully");
   } catch (error) {
-    console.error("[SUB_AGENT] Failed to clean up workspace:", error);
+    logger.error({ error }, "Failed to clean up workspace");
     // Don't throw - cleanup failures should not break the flow
   }
 }
@@ -141,7 +144,7 @@ export class SubAgent {
    * Execute sub-agent with automatic workspace cleanup
    */
   async execute(prompt: string): Promise<string> {
-    console.log("[SUB_AGENT] Starting execution");
+    logger.info("Starting execution");
 
     // Create workspace
     this.workspace = await createSubAgentWorkspace();
@@ -165,7 +168,7 @@ export class SubAgent {
           // Check for tool calls
           if (stepResult.staticToolCalls && stepResult.staticToolCalls.length > 0) {
             for (const toolCall of stepResult.staticToolCalls) {
-              console.log(`[SUB_AGENT] Tool call: ${toolCall.toolName}`, toolCall.input);
+              logger.info({ toolName: toolCall.toolName, input: toolCall.input }, "Tool call");
               if (this.config.onToolCall) {
                 this.config.onToolCall(toolCall.toolName, toolCall.input);
               }
@@ -175,7 +178,7 @@ export class SubAgent {
           // Check for tool results
           if (stepResult.staticToolResults && stepResult.staticToolResults.length > 0) {
             for (const toolResult of stepResult.staticToolResults) {
-              console.log(`[SUB_AGENT] Tool result: ${toolResult.toolName}`);
+              logger.info({ toolName: toolResult.toolName }, "Tool result");
               if (this.config.onToolResult) {
                 this.config.onToolResult(toolResult.toolName, toolResult.output, undefined);
               }
@@ -185,10 +188,10 @@ export class SubAgent {
       });
 
       // Execute agent
-      console.log("[SUB_AGENT] Executing agent with prompt:", prompt.substring(0, 100));
+      logger.info({ preview: prompt.substring(0, 100) }, "Executing agent");
       const result = await this.agent.generate({ prompt });
 
-      console.log("[SUB_AGENT] Execution completed");
+      logger.info("Execution completed");
       return result.text;
     } finally {
       // Clean up workspace even on error

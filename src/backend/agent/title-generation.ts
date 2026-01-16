@@ -3,6 +3,9 @@ import { smallModel } from "./model-config.js";
 import z from "zod";
 import { getGoLibFFI } from "@/backend/go-lib-ffi.js";
 import { AI_MAX_RETRIES, AI_MAX_RETRIES_LOW_PRIORITY } from "./config.js";
+import { createLogger } from "@/backend/logger";
+
+const logger = createLogger("backend:title-generation");
 
 /**
  * Generate conversation title using small model
@@ -43,7 +46,7 @@ export async function generateConversationTitle(content: string): Promise<string
     const cleanedTitle = goLib.stripMarkdown(rawTitleResult);
     return cleanedTitle.trim();
   } catch (error) {
-    console.error("Title generation failed:", error);
+    logger.error({ error }, "Title generation failed");
     // Fallback to truncated content
     const title = content.length > 50 ? content.substring(0, 47) + "..." : content;
     return title;
@@ -76,7 +79,7 @@ Title:`,
     const cleanedTitle = goLib.stripMarkdown(rawTitleNoQuotes);
     return cleanedTitle.trim();
   } catch (error) {
-    console.error("Title inference failed for", url, ":", error);
+    logger.error({ error, url }, "Title inference failed");
     // Fallback: extract domain and path
     try {
       const urlObj = new URL(url);
@@ -126,7 +129,7 @@ export async function extractSearchKeywords(query: string): Promise<string[]> {
 
     return keywords;
   } catch (error) {
-    console.error("Keyword extraction failed:", error);
+    logger.error({ error }, "Keyword extraction failed");
     // Fallback
     // Simple keyword extraction - in real app would use NLP
     const stopWords = [
@@ -219,7 +222,7 @@ Short description:`,
 
     return cleaned;
   } catch (error) {
-    console.error("Filename description generation failed:", error);
+    logger.error({ error }, "Filename description generation failed");
     // Fallback to keywords
     const keywords = await extractSearchKeywords(content);
     return keywords.slice(0, 3).join(" ");

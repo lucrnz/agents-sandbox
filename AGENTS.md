@@ -34,6 +34,7 @@ All documentation intended for AI agents (implementation guides, architecture de
 - `.llm/docs/IMPLEMENTATION_GUIDES.md` - Technical implementation details for agents
 - `.llm/docs/ARCHITECTURE_DECISIONS.md` - Architecture rationale and decisions
 - `.llm/docs/DEPLOYMENT_PROCEDURES.md` - Deployment and operational procedures
+- `.llm/docs/LOGGING.md` - Structured logging guide (Pino)
 
 **Keep the root clean** - Only AGENTS.md, README.md, and the CLAUDE.md/GEMINI.md symlinks belong in the root directory.
 

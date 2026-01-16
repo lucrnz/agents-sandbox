@@ -3,6 +3,9 @@ import { bigModel } from "./model-config.js";
 import { createDeepResearchTool } from "./deep-research.js";
 import type { ToolName } from "@/shared/commands";
 import type { ToolCallCallback, ToolResultCallback } from "@/shared/tool-types";
+import { createLogger } from "@/backend/logger";
+
+const logger = createLogger("backend:chat-agent");
 
 interface ChatAgentParams {
   enabledTools?: ToolName[];
@@ -34,7 +37,7 @@ export class ChatAgent {
       });
     }
 
-    console.log("[CHAT_AGENT] Initializing with tools:", Object.keys(tools));
+    logger.info({ tools: Object.keys(tools) }, "Initializing with tools");
 
     this.agent = new ToolLoopAgent({
       model: bigModel,
@@ -62,7 +65,10 @@ ${tools.deep_research ? "- When you need current information from the web, use t
         // Check for tool calls (tool execution starting)
         if (stepResult.staticToolCalls && stepResult.staticToolCalls.length > 0) {
           for (const toolCall of stepResult.staticToolCalls) {
-            console.log(`[CHAT_AGENT] Tool call detected: ${toolCall.toolName}`, toolCall.input);
+            logger.info(
+              { toolName: toolCall.toolName, input: toolCall.input },
+              "Tool call detected",
+            );
             if (params?.onToolCall) {
               params.onToolCall(toolCall.toolName, toolCall.input);
             }
@@ -72,7 +78,7 @@ ${tools.deep_research ? "- When you need current information from the web, use t
         // Check for tool results (tool execution completed)
         if (stepResult.staticToolResults && stepResult.staticToolResults.length > 0) {
           for (const toolResult of stepResult.staticToolResults) {
-            console.log(`[CHAT_AGENT] Tool result: ${toolResult.toolName}`);
+            logger.info({ toolName: toolResult.toolName }, "Tool result");
             if (params?.onToolResult) {
               params.onToolResult(toolResult.toolName, toolResult.output, undefined);
             }
@@ -100,7 +106,7 @@ ${tools.deep_research ? "- When you need current information from the web, use t
     prompt: string,
     abortSignal?: AbortSignal,
   ): AsyncGenerator<{ type: "reasoning" | "text"; content: string }, void, unknown> {
-    console.log("[CHAT_AGENT] generateResponse called");
+    logger.debug("Generate response called");
     try {
       const result = await this.agent.stream({ prompt, abortSignal });
 
@@ -108,7 +114,7 @@ ${tools.deep_research ? "- When you need current information from the web, use t
       for await (const chunk of result.fullStream) {
         // Check if aborted before yielding
         if (abortSignal?.aborted) {
-          console.log("[CHAT_AGENT] Generation aborted by user");
+          logger.info("Generation aborted by user");
           return;
         }
 
@@ -123,12 +129,12 @@ ${tools.deep_research ? "- When you need current information from the web, use t
     } catch (error) {
       // Check if this was an abort - if so, exit gracefully without error
       if (abortSignal?.aborted || (error instanceof Error && error.name === "AbortError")) {
-        console.log("[CHAT_AGENT] Generation aborted");
+        logger.info("Generation aborted");
         return;
       }
 
       const errorId = crypto.randomUUID();
-      console.error(`[CHAT_AGENT] Error ${errorId}:`, error);
+      logger.error({ error, errorId }, "Error generating response");
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       const originalError = error instanceof Error ? error.stack : String(error);
 
@@ -159,7 +165,7 @@ ${tools.deep_research ? "- When you need current information from the web, use t
       return result.text;
     } catch (error) {
       const errorId = crypto.randomUUID();
-      console.error(`[CHAT_AGENT] Error ${errorId}:`, error);
+      logger.error({ error, errorId }, "Error generating response");
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       const originalError = error instanceof Error ? error.stack : String(error);
 

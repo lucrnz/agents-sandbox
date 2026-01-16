@@ -36,6 +36,9 @@ import { createEventMessage } from "@/shared/command-system";
 import { SuggestAnswerChunkEvent, AgentStatusUpdateEvent } from "@/shared/commands";
 import { ActiveGenerationRegistry } from "@/backend/services/active-generation-registry";
 import { projectService, questionRegistry } from "@/backend/services/coder-runtime";
+import { createLogger } from "@/backend/logger";
+
+const logger = createLogger("backend:command-handlers");
 
 // ============================================================================
 // Command Handler Type
@@ -241,7 +244,7 @@ Just the suggested message itself.`;
       suggestedAnswer: fullResponse,
     };
   } catch (error) {
-    console.error("[SUGGEST_ANSWER] Error generating suggestion:", error);
+    logger.error({ error }, "Suggest answer generation failed");
     throw new Error("Failed to generate suggested answer");
   }
 });
@@ -250,7 +253,7 @@ commandHandlers.register(StopGeneration, async (payload, context) => {
   const { conversationId } = payload;
   const { ws } = context;
 
-  console.log("[STOP_GENERATION] Stopping generation for conversation:", conversationId);
+  logger.info({ conversationId }, "Stopping generation for conversation");
 
   // Emit stopping phase immediately
   const stoppingEvent = createEventMessage(AgentStatusUpdateEvent.name, {
@@ -263,14 +266,14 @@ commandHandlers.register(StopGeneration, async (payload, context) => {
   const result = ActiveGenerationRegistry.abort(conversationId);
 
   if (result.aborted) {
-    console.log("[STOP_GENERATION] Successfully stopped generation");
+    logger.info({ conversationId }, "Successfully stopped generation");
     return {
       stopped: true,
       partialContent: result.partialContent,
     };
   }
 
-  console.log("[STOP_GENERATION] No active generation found for conversation");
+  logger.info({ conversationId }, "No active generation found for conversation");
   return {
     stopped: false,
     partialContent: undefined,

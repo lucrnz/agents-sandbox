@@ -5,6 +5,9 @@ import { writeFile } from "fs/promises";
 import { join } from "path";
 import type { SubAgentWorkspace } from "./sub-agent";
 import { LARGE_PAGE_THRESHOLD } from "./config";
+import { createLogger } from "@/backend/logger";
+
+const logger = createLogger("backend:web-fetch");
 
 /**
  * Web fetch tool - fetches URLs and converts to markdown
@@ -29,15 +32,15 @@ Returns: Markdown content of the webpage. For large pages (>${thresholdKb}KB), s
       url: z.string().url().describe("The URL to fetch"),
     }),
     execute: async ({ url }: { url: string }) => {
-      console.log("[WEB_FETCH] Fetching request");
+      logger.info({ url }, "Fetching request");
 
       try {
         const content = await fetchUrlAndConvert(url);
-        console.log("[WEB_FETCH] Content length:", content.length);
+        logger.info({ length: content.length }, "Fetched content length");
 
         // If content is large, save to file
         if (content.length > LARGE_PAGE_THRESHOLD) {
-          console.log("[WEB_FETCH] Large page detected, saving to file");
+          logger.info({ length: content.length }, "Large page detected, saving to file");
 
           const workspace = getWorkspace();
           if (!workspace) {
@@ -56,7 +59,7 @@ Returns: Markdown content of the webpage. For large pages (>${thresholdKb}KB), s
 
           // Convert to virtual path
           const virtualPath = join(workspace.virtualPath, filename);
-          console.log("[WEB_FETCH] Saved to:", virtualPath);
+          logger.info({ virtualPath }, "Saved large page to virtual path");
 
           return `Large page content (${content.length} bytes) saved to: ${virtualPath}
 
@@ -66,10 +69,10 @@ Use the view tool to read the file:
         }
 
         // For small pages, return content directly
-        console.log("[WEB_FETCH] Small page, returning content directly");
+        logger.info({ length: content.length }, "Small page, returning content directly");
         return content;
       } catch (error) {
-        console.error("[WEB_FETCH] Fetch failed:", error);
+        logger.error({ error, url }, "Fetch failed");
         throw error;
       }
     },

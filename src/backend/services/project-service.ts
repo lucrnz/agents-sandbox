@@ -13,6 +13,9 @@ import {
   listProjects,
   upsertProjectFile,
 } from "@/backend/db";
+import { createLogger } from "@/backend/logger";
+
+const logger = createLogger("backend:project-service");
 
 export type ProjectPermissionMode = "ask" | "yolo";
 export type ProjectExportFormat = "zip" | "tar.gz";
@@ -186,8 +189,7 @@ export class ProjectService {
         : archiver("tar", { gzip: true, gzipOptions: { level: 9 } });
 
     archive.on("warning", (err) => {
-      // eslint-disable-next-line no-console
-      console.warn("[PROJECT_EXPORT] warning:", err);
+      logger.warn({ error: err }, "Project export warning");
     });
     archive.on("error", (err) => {
       throw err;

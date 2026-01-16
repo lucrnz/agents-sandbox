@@ -1,4 +1,7 @@
 import { getGoLibFFI, type SearchResult } from "@/backend/go-lib-ffi";
+import { createLogger } from "@/backend/logger";
+
+const logger = createLogger("backend:web-tools");
 import {
   BROWSER_USER_AGENT,
   DEFAULT_SEARCH_RESULTS_COUNT,
@@ -9,7 +12,7 @@ import {
 export type { SearchResult };
 
 export async function fetchUrlAndConvert(url: string): Promise<string> {
-  console.log("[WEB_TOOLS] Fetching URL");
+  logger.info({ url }, "Fetching URL");
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -24,14 +27,17 @@ export async function fetchUrlAndConvert(url: string): Promise<string> {
       signal: controller.signal,
     });
 
-    console.log("[WEB_TOOLS] Response status:", response.status, response.statusText);
+    logger.info(
+      { status: response.status, statusText: response.statusText },
+      "Fetch response status",
+    );
 
     if (!response.ok) {
       throw new Error(`Failed to fetch URL: ${response.status} ${response.statusText}`);
     }
 
     const contentType = response.headers.get("content-type") || "";
-    console.log("[WEB_TOOLS] Content type:", contentType);
+    logger.info({ contentType }, "Fetch content type");
 
     const contentLengthHeader = response.headers.get("content-length");
     const declaredLength = contentLengthHeader ? Number(contentLengthHeader) : NaN;
@@ -48,24 +54,24 @@ export async function fetchUrlAndConvert(url: string): Promise<string> {
       );
     }
 
-    console.log("[WEB_TOOLS] Raw content length:", content.length);
+    logger.info({ length: content.length }, "Fetched content length");
 
     // Convert HTML to Markdown
     if (contentType.includes("text/html")) {
-      console.log("[WEB_TOOLS] Processing HTML content");
+      logger.info("Processing HTML content");
       const cleanedHtml = removeNoisyElements(content);
       content = convertHtmlToMarkdown(cleanedHtml);
-      console.log("[WEB_TOOLS] Processed markdown length:", content.length);
+      logger.info({ length: content.length }, "Processed markdown length");
     }
     // Format JSON
     else if (contentType.includes("application/json") || contentType.includes("text/json")) {
-      console.log("[WEB_TOOLS] Processing JSON content");
+      logger.info("Processing JSON content");
       try {
         const parsed = JSON.parse(content);
         content = JSON.stringify(parsed, null, 2);
-        console.log("[WEB_TOOLS] Formatted JSON length:", content.length);
-      } catch {
-        console.log("[WEB_TOOLS] JSON parsing failed, keeping original");
+        logger.info({ length: content.length }, "Formatted JSON length");
+      } catch (error) {
+        logger.warn({ error }, "JSON parsing failed, keeping original");
         // Keep original if parsing fails
       }
     }
@@ -83,12 +89,12 @@ function removeNoisyElements(html: string): string {
   }
 
   try {
-    console.log("[WEB_TOOLS] Using Go library for HTML cleaning");
+    logger.info("Using Go library for HTML cleaning");
     const cleaned = goLib.cleanHTML(html);
-    console.log("[WEB_TOOLS] Go library cleaned HTML length:", cleaned.length);
+    logger.info({ length: cleaned.length }, "Go library cleaned HTML length");
     return cleaned;
   } catch (error) {
-    console.error("[WEB_TOOLS] Go library failed:", error);
+    logger.error({ error }, "Go library failed during HTML cleaning");
     throw error;
   }
 }
@@ -100,12 +106,12 @@ function convertHtmlToMarkdown(html: string): string {
   }
 
   try {
-    console.log("[WEB_TOOLS] Using Go library for HTML-to-markdown conversion");
+    logger.info("Using Go library for HTML-to-markdown conversion");
     const markdown = goLib.convertToMarkdown(html);
-    console.log("[WEB_TOOLS] Go library converted markdown length:", markdown.length);
+    logger.info({ length: markdown.length }, "Go library converted markdown length");
     return markdown;
   } catch (error) {
-    console.error("[WEB_TOOLS] Go library failed:", error);
+    logger.error({ error }, "Go library failed during markdown conversion");
     throw error;
   }
 }
@@ -115,7 +121,7 @@ export async function searchDuckDuckGo(
   query: string,
   maxResults: number = DEFAULT_SEARCH_RESULTS_COUNT,
 ): Promise<SearchResult[]> {
-  console.log("[WEB_TOOLS] Searching DuckDuckGo for:", query, "max results:", maxResults);
+  logger.info({ query, maxResults }, "Searching DuckDuckGo");
   const formData = new URLSearchParams({
     q: query,
     b: "",
@@ -140,7 +146,7 @@ export async function searchDuckDuckGo(
       signal: controller.signal,
     });
 
-    console.log("[WEB_TOOLS] Search response status:", response.status);
+    logger.info({ status: response.status }, "Search response status");
 
     if (!response.ok && response.status !== 202) {
       throw new Error(
@@ -149,9 +155,9 @@ export async function searchDuckDuckGo(
     }
 
     const html = await response.text();
-    console.log("[WEB_TOOLS] Raw search HTML length:", html.length);
+    logger.info({ length: html.length }, "Raw search HTML length");
     const results = parseSearchResults(html, maxResults);
-    console.log("[WEB_TOOLS] Parsed", results.length, "search results");
+    logger.info({ count: results.length }, "Parsed search results");
     return results;
   } finally {
     clearTimeout(timeoutId);
@@ -159,7 +165,7 @@ export async function searchDuckDuckGo(
 }
 
 function parseSearchResults(html: string, maxResults: number): SearchResult[] {
-  console.log("[WEB_TOOLS] Parsing search results, max:", maxResults);
+  logger.info({ maxResults }, "Parsing search results");
 
   const goLib = getGoLibFFI();
   if (!goLib) {
@@ -167,20 +173,21 @@ function parseSearchResults(html: string, maxResults: number): SearchResult[] {
   }
 
   try {
-    console.log("[WEB_TOOLS] Using Go library for search result parsing");
+    logger.info("Using Go library for search result parsing");
     const results = goLib.parseSearchResults(html, maxResults);
-    console.log("[WEB_TOOLS] Go library parsed", results.length, "results");
+    logger.info({ count: results.length }, "Go library parsed results");
 
     // Debug: Log when parsing might have failed
     if (results.length === 0 && html.length > 1000) {
-      console.warn("[WEB_TOOLS] Parsing returned 0 results despite large HTML response");
-      console.warn("[WEB_TOOLS] First 500 chars of HTML:", html.substring(0, 500));
-      console.warn("[WEB_TOOLS] This likely indicates a parsing issue, not rate limiting");
+      logger.warn(
+        { sample: html.substring(0, 500) },
+        "Parsing returned 0 results despite large HTML response",
+      );
     }
 
     return results;
   } catch (error) {
-    console.error("[WEB_TOOLS] Go library failed:", error);
+    logger.error({ error }, "Go library failed during search result parsing");
     throw error;
   }
 }

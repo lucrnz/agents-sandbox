@@ -2,6 +2,9 @@ import { z } from "zod";
 import { tool } from "ai";
 import { readFile } from "fs/promises";
 import type { SubAgentWorkspace, virtualPathToActual } from "./sub-agent.js";
+import { createLogger } from "@/backend/logger";
+
+const logger = createLogger("backend:grep-tool");
 
 /**
  * Grep tool - search within files in virtual workspace
@@ -37,7 +40,7 @@ SECURITY: Only paths within /home/agent are allowed. Any attempt to access files
         .describe("Text pattern to search for"),
     }),
     execute: async ({ path, pattern }: { path: string; pattern: string }) => {
-      console.log("[GREP] Requesting search in:", path, "pattern:", pattern);
+      logger.info({ path, pattern }, "Requesting search");
 
       const workspace = getWorkspace();
       if (!workspace) {
@@ -48,7 +51,7 @@ SECURITY: Only paths within /home/agent are allowed. Any attempt to access files
         // Convert virtual path to actual path (with security validation)
         const actualPath = virtualPathToActual(path, workspace);
 
-        console.log("[GREP] Reading file:", actualPath);
+        logger.info({ actualPath }, "Reading file");
 
         const content = await readFile(actualPath, "utf-8");
         const lines = content.split("\n");
@@ -64,7 +67,7 @@ SECURITY: Only paths within /home/agent are allowed. Any attempt to access files
           }
         }
 
-        console.log("[GREP] Found", matches.length, "matches");
+        logger.info({ count: matches.length }, "Found matches");
 
         if (matches.length === 0) {
           return `No matches found for pattern: "${pattern}"`;
@@ -78,7 +81,7 @@ SECURITY: Only paths within /home/agent are allowed. Any attempt to access files
 
         return result;
       } catch (error) {
-        console.error("[GREP] Failed to search file:", error);
+        logger.error({ error }, "Failed to search file");
 
         if (error instanceof Error && error.message.includes("Forbidden request")) {
           throw error; // Re-throw security errors as-is

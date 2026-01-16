@@ -2,6 +2,9 @@ import { z } from "zod";
 import { tool } from "ai";
 import { searchDuckDuckGo, formatSearchResults } from "./web-tools.js";
 import { DEFAULT_SEARCH_RESULTS_COUNT } from "./config";
+import { createLogger } from "@/backend/logger";
+
+const logger = createLogger("backend:web-search");
 
 /**
  * Web search tool - performs DuckDuckGo web search
@@ -24,11 +27,11 @@ Returns: Formatted search results with titles, URLs, and snippets.`,
       query: z.string().min(1).describe("The search query"),
     }),
     execute: async ({ query }: { query: string }) => {
-      console.log("[WEB_SEARCH] Searching for:", query);
+      logger.info({ query }, "Searching for query");
 
       try {
         const results = await searchDuckDuckGo(query, DEFAULT_SEARCH_RESULTS_COUNT);
-        console.log("[WEB_SEARCH] Found", results.length, "results");
+        logger.info({ count: results.length }, "Search results returned");
 
         if (results.length === 0) {
           return "No results found for your search query. This could mean the search tool is not working right now or there are no results for your query. Please try rephrasing your search or try again in a few minutes.";
@@ -36,7 +39,7 @@ Returns: Formatted search results with titles, URLs, and snippets.`,
 
         return formatSearchResults(results);
       } catch (error) {
-        console.error("[WEB_SEARCH] Search failed:", error);
+        logger.error({ error }, "Search failed");
         throw error;
       }
     },

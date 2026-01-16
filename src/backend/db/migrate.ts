@@ -2,6 +2,9 @@ import { Database } from "bun:sqlite";
 import { migrate } from "drizzle-orm/bun-sqlite/migrator";
 import { drizzle } from "drizzle-orm/bun-sqlite";
 import { readdirSync } from "fs";
+import { createLogger } from "@/backend/logger";
+
+const logger = createLogger("backend:db-migrate");
 
 export async function runMigrations() {
   const sqlite = new Database(process.env.DB_FILE_NAME || "sqlite.db");
@@ -17,20 +20,20 @@ export async function runMigrations() {
         .filter((file: string) => file.endsWith(".sql"))
         .sort();
     } catch (error) {
-      console.log("No migrations folder found, creating...");
+      logger.info("No migrations folder found, creating...");
     }
 
     if (migrationFiles.length === 0) {
       // If no migrations exist, create schema directly
-      console.log("No migrations found, applying schema directly...");
+      logger.info("No migrations found, applying schema directly...");
       applySchemaDirectly(sqlite);
     } else {
       // Run migrations
-      console.log(`Found ${migrationFiles.length} migration(s), running...`);
+      logger.info({ count: migrationFiles.length }, "Running migrations");
       migrate(db, { migrationsFolder: migrationsPath });
     }
   } catch (error) {
-    console.error("Migration failed:", error);
+    logger.error({ error }, "Migration failed");
   } finally {
     sqlite.close();
   }
@@ -60,16 +63,16 @@ function applySchemaDirectly(sqlite: Database) {
     )
   `);
 
-  console.log("Database schema created successfully");
+  logger.info("Database schema created successfully");
 }
 
 // Generate migration files manually using schema
 export function generateMigration(name: string) {
-  console.log(`
-To generate migrations, you need to run:
-  bunx drizzle-kit generate --name=${name}
-
-However, since we're using bun:sqlite without better-sqlite3 or libsql,
-you'll need to apply migrations manually or use the direct schema approach.
-  `);
+  logger.info(
+    {
+      name,
+      command: `bunx drizzle-kit generate --name=${name}`,
+    },
+    "Generate migration instructions",
+  );
 }

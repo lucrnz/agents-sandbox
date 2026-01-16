@@ -8,10 +8,15 @@ import {
 } from "@/shared/command-system";
 import { commandHandlers } from "./command-handlers";
 import { getDockerManager, questionRegistry } from "@/backend/services/coder-runtime";
+import { createLogger } from "@/backend/logger";
+
+const logger = createLogger("backend:index");
 
 // Start periodic cleanup of expired containers
 setInterval(() => {
-  getDockerManager().cleanupExpired().catch(console.error);
+  getDockerManager()
+    .cleanupExpired()
+    .catch((error) => logger.error({ error }, "Cleanup expired containers failed"));
 }, 60 * 1000); // Check every minute
 
 const server = serve<{ conversationId?: string }>({
@@ -43,7 +48,7 @@ const server = serve<{ conversationId?: string }>({
     perMessageDeflate: true,
 
     async open(ws) {
-      console.log("WebSocket connected");
+      logger.info("WebSocket connected");
       ws.subscribe("chat");
     },
 
@@ -65,7 +70,7 @@ const server = serve<{ conversationId?: string }>({
             ws.send(JSON.stringify(response));
           } catch (error) {
             const errorId = crypto.randomUUID();
-            console.error(`[COMMAND_ERROR] ${command.command} failed (ID: ${errorId}):`, error);
+            logger.error({ error, command: command.command, errorId }, "Command handler failed");
 
             const errorResponse = createCommandError(
               command.command,
@@ -78,12 +83,12 @@ const server = serve<{ conversationId?: string }>({
           }
         }
       } catch (error) {
-        console.error("WebSocket message processing error:", error);
+        logger.error({ error }, "WebSocket message processing error");
       }
     },
 
     async close(ws, code, reason) {
-      console.log(`WebSocket closed: ${code} - ${reason}`);
+      logger.info({ code, reason }, "WebSocket closed");
       ws.unsubscribe("chat");
 
       const conversationId = ws.data.conversationId;
@@ -100,5 +105,5 @@ const server = serve<{ conversationId?: string }>({
   },
 });
 
-console.log(`🚀 Server running at ${server.url}`);
-console.log(`🔌 WebSocket server available at ws://${server.hostname}:${server.port}`);
+logger.info({ url: server.url }, "Server running");
+logger.info({ host: server.hostname, port: server.port }, "WebSocket server available");

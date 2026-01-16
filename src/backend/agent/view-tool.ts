@@ -2,6 +2,9 @@ import { z } from "zod";
 import { tool } from "ai";
 import { readFile } from "fs/promises";
 import type { SubAgentWorkspace, virtualPathToActual } from "./sub-agent.js";
+import { createLogger } from "@/backend/logger";
+
+const logger = createLogger("backend:view-tool");
 
 /**
  * View tool - read file contents from virtual workspace
@@ -31,7 +34,7 @@ SECURITY: Only paths within /home/agent are allowed. Any attempt to access files
       path: z.string().describe("File path to read (absolute from /home/agent or relative)"),
     }),
     execute: async ({ path }: { path: string }) => {
-      console.log("[VIEW] Requesting path:", path);
+      logger.info({ path }, "Requesting path");
 
       const workspace = getWorkspace();
       if (!workspace) {
@@ -42,14 +45,14 @@ SECURITY: Only paths within /home/agent are allowed. Any attempt to access files
         // Convert virtual path to actual path (with security validation)
         const actualPath = virtualPathToActual(path, workspace);
 
-        console.log("[VIEW] Reading file:", actualPath);
+        logger.info({ actualPath }, "Reading file");
 
         const content = await readFile(actualPath, "utf-8");
-        console.log("[VIEW] File length:", content.length);
+        logger.info({ length: content.length }, "File length");
 
         return content;
       } catch (error) {
-        console.error("[VIEW] Failed to read file:", error);
+        logger.error({ error }, "Failed to read file");
 
         if (error instanceof Error && error.message.includes("Forbidden request")) {
           throw error; // Re-throw security errors as-is

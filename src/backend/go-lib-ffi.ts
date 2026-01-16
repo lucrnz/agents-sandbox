@@ -1,6 +1,9 @@
 import { dlopen, FFIType, suffix, CString } from "bun:ffi";
 import path from "path";
 import fs from "fs";
+import { createLogger } from "@/backend/logger";
+
+const logger = createLogger("backend:go-lib-ffi");
 
 // Define FFI interface for the Go library
 interface GoLibFFISymbols {
@@ -68,7 +71,7 @@ export class GoLibFFIWrapper {
   private loadLibrary(): void {
     try {
       const libPath = getLibraryPath();
-      console.log(`[GO_LIB_FFI] Loading library from: ${libPath}`);
+      logger.info({ libPath }, "Loading Go library");
 
       this.lib = dlopen(libPath, {
         CleanHTML: {
@@ -98,13 +101,13 @@ export class GoLibFFIWrapper {
       });
 
       this.isLoaded = true;
-      console.log("[GO_LIB_FFI] Library loaded successfully");
+      logger.info("Go library loaded successfully");
 
       // Log version for debugging
       const version = this.getVersion();
-      console.log(`[GO_LIB_FFI] Library version: ${version}`);
+      logger.info({ version }, "Go library version");
     } catch (error) {
-      console.warn("[GO_LIB_FFI] Failed to load library:", error);
+      logger.warn({ error }, "Failed to load Go library");
       this.isLoaded = false;
     }
   }
@@ -123,7 +126,7 @@ export class GoLibFFIWrapper {
         (this.lib.symbols.FreeString as unknown as (ptr: P) => void)(ptr);
       } catch (e) {
         // Ignore errors from FreeString
-        console.error("[GO_LIB_FFI] Error freeing pointer:", e);
+        logger.error({ error: e }, "Error freeing pointer");
       }
     }
   }
@@ -184,7 +187,7 @@ export class GoLibFFIWrapper {
         (this.lib!.symbols.CleanHTML as unknown as CleanHTMLFn)(buffer),
       );
     } catch (error) {
-      console.error("[GO_LIB_FFI] Error in cleanHTML:", error);
+      logger.error({ error }, "Error in cleanHTML");
       throw error;
     }
   }
@@ -197,7 +200,7 @@ export class GoLibFFIWrapper {
         (this.lib!.symbols.ConvertHTMLToMarkdown as unknown as ConvertFn)(buffer),
       );
     } catch (error) {
-      console.error("[GO_LIB_FFI] Error in convertToMarkdown:", error);
+      logger.error({ error }, "Error in convertToMarkdown");
       throw error;
     }
   }
@@ -220,14 +223,13 @@ export class GoLibFFIWrapper {
       try {
         goResults = JSON.parse(result);
       } catch (parseError) {
-        console.error("[GO_LIB_FFI] Failed to parse JSON:", parseError);
-        console.error("[GO_LIB_FFI] Raw result:", result);
+        logger.error({ error: parseError, result }, "Failed to parse JSON");
         return [];
       }
 
       // Ensure we have an array
       if (!Array.isArray(goResults)) {
-        console.warn("[GO_LIB_FFI] ParseSearchResults did not return an array");
+        logger.warn({ result }, "ParseSearchResults did not return an array");
         return [];
       }
 
@@ -239,7 +241,7 @@ export class GoLibFFIWrapper {
         position: r.Position || 0,
       }));
     } catch (error) {
-      console.error("[GO_LIB_FFI] Error in parseSearchResults:", error);
+      logger.error({ error }, "Error in parseSearchResults");
       throw error;
     }
   }
@@ -252,7 +254,7 @@ export class GoLibFFIWrapper {
         (this.lib!.symbols.StripMarkdown as unknown as StripFn)(buffer),
       );
     } catch (error) {
-      console.error("[GO_LIB_FFI] Error in stripMarkdown:", error);
+      logger.error({ error }, "Error in stripMarkdown");
       throw error;
     }
   }
@@ -269,7 +271,7 @@ export class GoLibFFIWrapper {
         "unknown",
       );
     } catch (error) {
-      console.error("[GO_LIB_FFI] Error getting version:", error);
+      logger.error({ error }, "Error getting version");
       return "unknown";
     }
   }

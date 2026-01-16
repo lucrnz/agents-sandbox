@@ -30,6 +30,9 @@ import { DEFAULT_CONVERSATION_TITLE_PREFIX } from "@/backend/agent/config.js";
 import { BackgroundTaskTracker } from "./background-task-tracker";
 import { ActiveGenerationRegistry } from "./active-generation-registry";
 import { getDockerManager, questionRegistry } from "./coder-runtime";
+import { createLogger } from "@/backend/logger";
+
+const logger = createLogger("backend:chat-orchestrator");
 
 export type ChatOrchestratorContext = {
   ws: ServerWebSocket<{ conversationId?: string }>;
@@ -115,7 +118,7 @@ export class ChatOrchestrator {
     ActiveGenerationRegistry.register(this.conversationId, abortController);
 
     try {
-      console.log("[CHAT_ORCHESTRATOR] Starting AI response flow");
+      logger.info("Starting AI response flow");
 
       let fullResponse = "";
 
@@ -166,10 +169,7 @@ export class ChatOrchestrator {
 
       const onCriticalError = (error: Error, originalError?: string) => {
         const errorId = crypto.randomUUID();
-        console.error(
-          `[CHAT_ORCHESTRATOR] Critical Agent Error (ID: ${errorId}):`,
-          originalError || error,
-        );
+        logger.error({ error, errorId, originalError }, "Critical agent error");
 
         this.emitEvent(ChatAgentErrorEvent.name, {
           conversationId: this.conversationId,
@@ -198,7 +198,7 @@ export class ChatOrchestrator {
       for await (const chunk of stream) {
         // Check if aborted
         if (abortController.signal.aborted) {
-          console.log("[CHAT_ORCHESTRATOR] Generation aborted, stopping stream");
+          logger.info("Generation aborted, stopping stream");
           break;
         }
 
@@ -239,7 +239,7 @@ export class ChatOrchestrator {
           // Update message periodically (every 10 chunks or first chunk)
           if (updateCount % 10 === 0 || updateCount === 1) {
             await updateMessage(aiMessage.id, fullResponse).catch((err) =>
-              console.error("[CHAT_ORCHESTRATOR] Error updating message:", err),
+              logger.error({ error: err }, "Error updating message"),
             );
           }
         }
@@ -247,7 +247,7 @@ export class ChatOrchestrator {
 
       // Check if aborted - handle differently
       if (abortController.signal.aborted) {
-        console.log("[CHAT_ORCHESTRATOR] Finalizing aborted generation");
+        logger.info("Finalizing aborted generation");
         // Update message with partial content + stopped indicator
         const stoppedContent = fullResponse + "\n\n*[Generation stopped by user]*";
         await updateMessage(aiMessage.id, stoppedContent);
@@ -278,11 +278,11 @@ export class ChatOrchestrator {
         abortController.signal.aborted ||
         (error instanceof Error && error.name === "AbortError")
       ) {
-        console.log("[CHAT_ORCHESTRATOR] Generation aborted (caught in error handler)");
+        logger.info("Generation aborted (caught in error handler)");
         return;
       }
 
-      console.error("[CHAT_ORCHESTRATOR] AI Generation Error:", error);
+      logger.error({ error }, "AI generation error");
       await this.handleError(error);
     } finally {
       // Mark generation as complete
@@ -407,7 +407,7 @@ export class ChatOrchestrator {
         });
       }
     } catch (dbError) {
-      console.error("[CHAT_ORCHESTRATOR] Database error during error handling:", dbError);
+      logger.error({ error: dbError }, "Database error during error handling");
     }
   }
 }

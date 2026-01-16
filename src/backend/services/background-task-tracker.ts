@@ -1,6 +1,9 @@
 import type { ServerWebSocket } from "bun";
 import { createEventMessage } from "@/shared/command-system";
 import { BackgroundTaskErrorEvent } from "@/shared/commands";
+import { createLogger } from "@/backend/logger";
+
+const logger = createLogger("backend:background-task-tracker");
 
 export type TaskType = "title_generation" | "ai_response";
 export type TaskState = "pending" | "completed" | "failed";
@@ -47,7 +50,7 @@ export class BackgroundTaskTracker {
       task.completedAt = new Date();
 
       const duration = task.completedAt.getTime() - task.startedAt.getTime();
-      console.log(`[BACKGROUND_TASK] ${type} completed for ${conversationId} in ${duration}ms`);
+      logger.info({ type, conversationId, duration }, "Background task completed");
 
       return result;
     } catch (error) {
@@ -58,13 +61,15 @@ export class BackgroundTaskTracker {
       const duration = task.completedAt.getTime() - task.startedAt.getTime();
 
       // Detailed server-side logging
-      console.error(`[BACKGROUND_TASK] ${type} failed`);
-      console.error(`  ConversationId: ${conversationId}`);
-      console.error(`  Duration: ${duration}ms`);
-      console.error(`  Error: ${task.error.message}`);
-      if (task.error.stack) {
-        console.error(`  Stack: ${task.error.stack}`);
-      }
+      logger.error(
+        {
+          type,
+          conversationId,
+          duration,
+          error: task.error,
+        },
+        "Background task failed",
+      );
 
       // Emit generic error to client
       const genericMessage = "A background operation failed. Please try again if needed.";
@@ -78,7 +83,7 @@ export class BackgroundTaskTracker {
       try {
         ws.send(JSON.stringify(event));
       } catch (wsError) {
-        console.error("[BACKGROUND_TASK] Failed to send error event to WebSocket:", wsError);
+        logger.error({ error: wsError }, "Failed to send error event to WebSocket");
       }
 
       throw error;

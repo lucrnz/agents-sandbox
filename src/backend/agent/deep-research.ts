@@ -9,6 +9,9 @@ import { createGrepTool } from "./grep-tool";
 import { virtualPathToActual } from "./sub-agent";
 import { MAX_SUB_AGENT_STEPS } from "./config";
 import type { ToolCallCallback, ToolResultCallback } from "@/shared/tool-types";
+import { createLogger } from "@/backend/logger";
+
+const logger = createLogger("backend:deep-research");
 
 export const DeepResearchParamsSchema = z.object({
   url: z
@@ -104,12 +107,12 @@ The sub-agent autonomously:
 - Provides structured response with sources`,
     inputSchema: DeepResearchParamsSchema,
     execute: async ({ prompt, url }: DeepResearchParams) => {
-      console.log("[DEEP_RESEARCH] *** SUB-AGENT START ***");
-      console.log("[DEEP_RESEARCH] Input received");
+      logger.info({ hasUrl: Boolean(url) }, "Sub-agent start");
+      logger.info("Input received");
 
       // Determine execution mode for logging
       const mode = url ? "URL Analysis" : "Web Search";
-      console.log("[DEEP_RESEARCH] MODE:", mode);
+      logger.info({ mode }, "Sub-agent mode");
 
       // Create tools that can access the workspace
       let currentWorkspace: SubAgentWorkspace | null = null;
@@ -134,16 +137,16 @@ The sub-agent autonomously:
         },
         maxSteps: MAX_SUB_AGENT_STEPS,
         onToolCall: (toolName: string, args: unknown) => {
-          console.log(`[DEEP_RESEARCH] Sub-agent tool call: ${toolName}`, args);
+          logger.info({ toolName, args }, "Sub-agent tool call");
           if (options?.onSubAgentToolCall) {
             options.onSubAgentToolCall(toolName, args);
           }
         },
         onToolResult: (toolName: string, result: unknown, error?: Error) => {
           if (error) {
-            console.error(`[DEEP_RESEARCH] Sub-agent tool error: ${toolName}`, error);
+            logger.error({ toolName, error }, "Sub-agent tool error");
           } else {
-            console.log(`[DEEP_RESEARCH] Sub-agent tool result: ${toolName}`);
+            logger.info({ toolName }, "Sub-agent tool result");
           }
           if (options?.onSubAgentToolResult) {
             options.onSubAgentToolResult(toolName, result, error);
@@ -170,20 +173,19 @@ Use web_search to find relevant information, then use web_fetch to get content f
 
       try {
         // Execute sub-agent
-        console.log("[DEEP_RESEARCH] Executing sub-agent");
+        logger.info("Executing sub-agent");
         const result = await subAgent.execute(subAgentPrompt);
 
-        console.log("[DEEP_RESEARCH] Sub-agent completed");
-        console.log("[DEEP_RESEARCH] Result length:", result.length);
+        logger.info({ length: result.length }, "Sub-agent completed");
 
         return result;
       } catch (error) {
-        console.error("[DEEP_RESEARCH] Sub-agent failed:", error);
+        logger.error({ error }, "Sub-agent failed");
 
         const errorMessage = error instanceof Error ? error.message : "Unknown error";
         return `Web research failed: ${errorMessage}. Please try rephrasing your request or try again later.`;
       } finally {
-        console.log("[DEEP_RESEARCH] *** SUB-AGENT END ***");
+        logger.info("Sub-agent end");
       }
     },
   });
