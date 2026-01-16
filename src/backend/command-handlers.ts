@@ -126,12 +126,15 @@ commandHandlers.register(SendMessage, async (payload, context) => {
   };
 });
 
-commandHandlers.register(LoadConversation, async (payload) => {
+commandHandlers.register(LoadConversation, async (payload, context) => {
   const { conversationId } = payload;
+  const { ws } = context;
 
   if (conversationId) {
     const conv = await getConversationWithMessages(conversationId);
     if (!conv) throw new Error("Conversation not found");
+
+    ws.data.conversationId = conv.id;
 
     return {
       conversationId: conv.id,
@@ -147,6 +150,8 @@ commandHandlers.register(LoadConversation, async (payload) => {
   const newConv = await getOrCreateConversation();
   if (!newConv) throw new Error("Failed to create conversation");
 
+  ws.data.conversationId = newConv.id;
+
   return {
     conversationId: newConv.id,
     title: newConv.title,
@@ -154,9 +159,12 @@ commandHandlers.register(LoadConversation, async (payload) => {
   };
 });
 
-commandHandlers.register(ReserveConversation, async () => {
+commandHandlers.register(ReserveConversation, async (_payload, context) => {
+  const { ws } = context;
   const newConv = await getOrCreateConversation();
   if (!newConv) throw new Error("Failed to reserve conversation");
+
+  ws.data.conversationId = newConv.id;
 
   return {
     conversationId: newConv.id,

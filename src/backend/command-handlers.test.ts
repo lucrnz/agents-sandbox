@@ -128,6 +128,7 @@ describe("Command Handlers", () => {
       };
 
       expect(result.conversationId).toBe("conv-id");
+      expect(ws.data.conversationId).toBe("conv-id");
       expect(db.getOrCreateConversation).toHaveBeenCalled();
     });
   });
@@ -142,6 +143,7 @@ describe("Command Handlers", () => {
       )) as LoadConversationResponse;
 
       expect(result.conversationId).toBe("conv-id");
+      expect(ws.data.conversationId).toBe("conv-id");
       expect(db.getConversationWithMessages).toHaveBeenCalledWith("conv-id");
     });
 
@@ -154,6 +156,7 @@ describe("Command Handlers", () => {
       )) as LoadConversationResponse;
 
       expect(result.conversationId).toBe("conv-id");
+      expect(ws.data.conversationId).toBe("conv-id");
       expect(db.getOrCreateConversation).toHaveBeenCalled();
     });
   });
