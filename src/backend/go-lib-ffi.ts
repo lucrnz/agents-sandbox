@@ -37,11 +37,11 @@ function getLibraryPath(): string {
   const possibleFileNames = [`libgo-lib-ffi.${suffix}`, `go-lib-ffi.${suffix}`];
 
   const possibleDirectories = [
-    // Development paths
-    path.join(process.cwd(), "go-lib-ffi"),
-    path.join(process.cwd(), "src", "backend", "agent"),
     // Production paths
     path.join(__dirname),
+    // Local development / integration test paths
+    path.join(process.cwd(), "go-lib-ffi"),
+    path.join(process.cwd(), "src", "backend"),
   ];
 
   for (const directory of possibleDirectories) {
