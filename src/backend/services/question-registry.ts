@@ -87,12 +87,21 @@ export class QuestionRegistry {
     return { questionId, answer };
   }
 
-  answer(input: { questionId: string; selectedOptionId: string; inputValue?: string }) {
+  answer(input: {
+    questionId: string;
+    selectedOptionId: string;
+    inputValue?: string;
+    conversationId: string;
+  }) {
     this.cleanupExpired();
 
     const pending = this.pendingById.get(input.questionId);
     if (!pending) {
       throw new Error("No pending question found (already answered or expired).");
+    }
+
+    if (pending.conversationId !== input.conversationId) {
+      throw new Error("Question does not belong to this conversation.");
     }
 
     this.pendingById.delete(input.questionId);

@@ -29,7 +29,7 @@ Returns: Markdown content of the webpage. For large pages (>${thresholdKb}KB), s
       url: z.string().url().describe("The URL to fetch"),
     }),
     execute: async ({ url }: { url: string }) => {
-      console.log("[WEB_FETCH] Fetching:", url);
+      console.log("[WEB_FETCH] Fetching request");
 
       try {
         const content = await fetchUrlAndConvert(url);

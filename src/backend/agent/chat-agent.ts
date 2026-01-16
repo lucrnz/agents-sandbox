@@ -100,10 +100,7 @@ ${tools.deep_research ? "- When you need current information from the web, use t
     prompt: string,
     abortSignal?: AbortSignal,
   ): AsyncGenerator<{ type: "reasoning" | "text"; content: string }, void, unknown> {
-    console.log(
-      "[CHAT_AGENT] generateResponse called with:",
-      prompt.substring(0, 100) + (prompt.length > 100 ? "..." : ""),
-    );
+    console.log("[CHAT_AGENT] generateResponse called");
     try {
       const result = await this.agent.stream({ prompt, abortSignal });
 

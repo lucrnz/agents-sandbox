@@ -34,6 +34,11 @@ export const BROWSER_USER_AGENT =
 export const FETCH_TIMEOUT_MS = 30_000; // 30 seconds
 
 /**
+ * Maximum response size for fetched content in bytes.
+ */
+export const MAX_FETCH_BYTES = 2 * 1024 * 1024; // 2MB
+
+/**
  * Maximum retries for AI model calls.
  */
 export const AI_MAX_RETRIES = 2;

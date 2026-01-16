@@ -3,6 +3,7 @@ import { registry, type CommandDef } from "@/shared/command-system";
 import {
   SendMessage,
   LoadConversation,
+  ReserveConversation,
   GetConversations,
   SuggestAnswer,
   StopGeneration,
@@ -18,6 +19,7 @@ import {
 } from "@/shared/commands";
 import {
   getOrCreateConversation,
+  getConversation,
   getConversationWithMessages,
   getConversationsWithMessages,
   addMessage,
@@ -83,8 +85,17 @@ commandHandlers.register(SendMessage, async (payload, context) => {
   const { content, conversationId: reqConvId, selectedTools } = payload;
   const { ws } = context;
 
-  const targetConversationId = reqConvId || context.conversationId;
-  const conversation = await getOrCreateConversation(targetConversationId);
+  let conversation = null;
+
+  if (reqConvId) {
+    conversation = await getConversation(reqConvId);
+    if (!conversation) {
+      throw new Error("Conversation not found");
+    }
+  } else {
+    const targetConversationId = context.conversationId;
+    conversation = await getOrCreateConversation(targetConversationId);
+  }
 
   if (!conversation) {
     throw new Error("Failed to create conversation");
@@ -131,16 +142,26 @@ commandHandlers.register(LoadConversation, async (payload) => {
         createdAt: m?.createdAt?.toISOString() || new Date().toISOString(),
       })),
     };
-  } else {
-    const newConv = await getOrCreateConversation();
-    if (!newConv) throw new Error("Failed to create conversation");
-
-    return {
-      conversationId: newConv.id,
-      title: newConv.title,
-      messages: [],
-    };
   }
+
+  const newConv = await getOrCreateConversation();
+  if (!newConv) throw new Error("Failed to create conversation");
+
+  return {
+    conversationId: newConv.id,
+    title: newConv.title,
+    messages: [],
+  };
+});
+
+commandHandlers.register(ReserveConversation, async () => {
+  const newConv = await getOrCreateConversation();
+  if (!newConv) throw new Error("Failed to reserve conversation");
+
+  return {
+    conversationId: newConv.id,
+    title: newConv.title,
+  };
 });
 
 commandHandlers.register(GetConversations, async () => {
@@ -377,11 +398,21 @@ commandHandlers.register(SetPermissionMode, async (payload) => {
 // Agent Questions (blocking)
 // ============================================================================
 
-commandHandlers.register(AnswerAgentQuestion, async (payload) => {
+commandHandlers.register(AnswerAgentQuestion, async (payload, context) => {
+  const conversationId = context.conversationId;
+  if (!conversationId) {
+    throw new Error("Conversation ID is required to answer agent questions");
+  }
+
+  if (conversationId !== payload.conversationId) {
+    throw new Error("Conversation mismatch for agent question response");
+  }
+
   questionRegistry.answer({
     questionId: payload.questionId,
     selectedOptionId: payload.selectedOptionId,
     inputValue: payload.inputValue,
+    conversationId: payload.conversationId,
   });
   return { acknowledged: true };
 });

@@ -3,7 +3,7 @@ import type { Container } from "dockerode";
 import archiver from "archiver";
 import { PassThrough, type Readable } from "stream";
 import * as tarStream from "tar-stream";
-import { ProjectService } from "@/backend/services/project-service";
+import { ProjectService, IGNORED_PATH_PREFIXES } from "@/backend/services/project-service";
 
 type ConversationId = string;
 
@@ -23,20 +23,6 @@ type ManagedContainer = {
 };
 
 const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
-
-const IGNORED_PATH_PREFIXES = [
-  "node_modules/",
-  ".venv/",
-  "venv/",
-  "__pycache__/",
-  ".git/",
-  "dist/",
-  "build/",
-  "bin/",
-  ".cache/",
-  "coverage/",
-  ".next/",
-];
 
 function isIgnoredPath(relPath: string): boolean {
   const p = relPath.replaceAll("\\", "/");
@@ -263,10 +249,13 @@ export class DockerManager {
         return;
       }
 
-      streamToBuffer(stream)
-        .then((buf) => {
-          writeOps.push(this.projectService.writeFileFromBuffer(input.projectId, relPath, buf));
-        })
+      const writeOp = streamToBuffer(stream).then((buf) =>
+        this.projectService.writeFileFromBuffer(input.projectId, relPath, buf),
+      );
+
+      writeOps.push(writeOp);
+
+      writeOp
         .catch(() => {})
         .finally(() => {
           next();

@@ -105,7 +105,7 @@ The sub-agent autonomously:
     inputSchema: DeepResearchParamsSchema,
     execute: async ({ prompt, url }: DeepResearchParams) => {
       console.log("[DEEP_RESEARCH] *** SUB-AGENT START ***");
-      console.log("[DEEP_RESEARCH] Input:", { prompt, url });
+      console.log("[DEEP_RESEARCH] Input received");
 
       // Determine execution mode for logging
       const mode = url ? "URL Analysis" : "Web Search";

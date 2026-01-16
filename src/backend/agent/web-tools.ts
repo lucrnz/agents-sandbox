@@ -1,10 +1,15 @@
 import { getGoLibFFI, type SearchResult } from "@/backend/go-lib-ffi";
-import { BROWSER_USER_AGENT, DEFAULT_SEARCH_RESULTS_COUNT, FETCH_TIMEOUT_MS } from "./config";
+import {
+  BROWSER_USER_AGENT,
+  DEFAULT_SEARCH_RESULTS_COUNT,
+  FETCH_TIMEOUT_MS,
+  MAX_FETCH_BYTES,
+} from "./config";
 
 export type { SearchResult };
 
 export async function fetchUrlAndConvert(url: string): Promise<string> {
-  console.log("[WEB_TOOLS] Fetching URL:", url);
+  console.log("[WEB_TOOLS] Fetching URL");
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -27,7 +32,21 @@ export async function fetchUrlAndConvert(url: string): Promise<string> {
 
     const contentType = response.headers.get("content-type") || "";
     console.log("[WEB_TOOLS] Content type:", contentType);
+
+    const contentLengthHeader = response.headers.get("content-length");
+    const declaredLength = contentLengthHeader ? Number(contentLengthHeader) : NaN;
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_FETCH_BYTES) {
+      throw new Error(
+        `Response too large (${declaredLength} bytes). Max allowed is ${MAX_FETCH_BYTES} bytes.`,
+      );
+    }
+
     let content = await response.text();
+    if (content.length > MAX_FETCH_BYTES) {
+      throw new Error(
+        `Response too large (${content.length} bytes). Max allowed is ${MAX_FETCH_BYTES} bytes.`,
+      );
+    }
 
     console.log("[WEB_TOOLS] Raw content length:", content.length);
 

@@ -3,6 +3,7 @@ import { commandHandlers } from "./command-handlers";
 import {
   SendMessage,
   LoadConversation,
+  ReserveConversation,
   GetConversations,
   type SendMessageResponse,
   type LoadConversationResponse,
@@ -28,6 +29,14 @@ describe("Command Handlers", () => {
     spies.push(
       spyOn(db, "getOrCreateConversation").mockImplementation(async () => ({
         id: "conv-id",
+        title: "Chat",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })),
+    );
+    spies.push(
+      spyOn(db, "getConversation").mockImplementation(async (id) => ({
+        id,
         title: "Chat",
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -90,11 +99,36 @@ describe("Command Handlers", () => {
       )) as SendMessageResponse;
 
       expect(result.conversationId).toBe("conv-id");
-      expect(db.getOrCreateConversation).toHaveBeenCalledWith("conv-id");
+      expect(db.getConversation).toHaveBeenCalledWith("conv-id");
       expect(db.addMessage).toHaveBeenCalledWith("conv-id", "user", "Hello");
       // For prototype spies, we check the spy itself
       const orchestratorSpy = spies.find((s) => s.name === "processUserMessage");
       expect(orchestratorSpy!).toHaveBeenCalledWith("Hello");
+    });
+
+    test("should create new conversation when no ID is provided", async () => {
+      const payload = { content: "Hello" };
+      const result = (await commandHandlers.execute(
+        SendMessage.name,
+        payload,
+        context,
+      )) as SendMessageResponse;
+
+      expect(result.conversationId).toBe("conv-id");
+      expect(db.getOrCreateConversation).toHaveBeenCalledWith(undefined);
+      expect(db.addMessage).toHaveBeenCalledWith("conv-id", "user", "Hello");
+    });
+  });
+
+  describe("ReserveConversation", () => {
+    test("should reserve a conversation", async () => {
+      const result = (await commandHandlers.execute(ReserveConversation.name, {}, context)) as {
+        conversationId: string;
+        title: string;
+      };
+
+      expect(result.conversationId).toBe("conv-id");
+      expect(db.getOrCreateConversation).toHaveBeenCalled();
     });
   });
 

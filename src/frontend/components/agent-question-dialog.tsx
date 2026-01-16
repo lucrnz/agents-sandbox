@@ -44,6 +44,7 @@ export function AgentQuestionDialog({
     try {
       await send(AnswerAgentQuestion, {
         questionId: question.questionId,
+        conversationId: question.conversationId,
         selectedOptionId,
         inputValue: inputValue.trim() || undefined,
       });

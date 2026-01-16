@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import {
   SendMessage,
   LoadConversation,
+  ReserveConversation,
   GetConversations,
   SuggestAnswer,
   StopGeneration,
@@ -123,6 +124,7 @@ export default function ChatPage() {
   const [selectedTools, setSelectedTools] = useState<ToolName[]>([]);
   const [expandedReasoning, setExpandedReasoning] = useState<Set<number>>(new Set());
   const [pendingQuestion, setPendingQuestion] = useState<AgentQuestionPayload | undefined>();
+  const [isNewConversationDialogOpen, setIsNewConversationDialogOpen] = useState(false);
 
   // Random greeting - memoized to stay consistent during session
   const greeting = useMemo(() => GREETINGS[Math.floor(Math.random() * GREETINGS.length)], []);
@@ -461,6 +463,31 @@ export default function ChatPage() {
     }
   }, [send]);
 
+  const resetConversationState = useCallback(() => {
+    setIsLoading(false);
+    setLoadingPhase("thinking");
+    setLoadingMessage(undefined);
+    setHasAgentError(false);
+    setLastFailedMessage("");
+    setPendingQuestion(undefined);
+    setIsAutoAnswerMode(false);
+    setIsGeneratingSuggestion(false);
+    isStartingAutoAnswerRef.current = false;
+    isGeneratingSuggestionRef.current = false;
+    if (autoAnswerTimeoutRef.current) {
+      clearTimeout(autoAnswerTimeoutRef.current);
+      autoAnswerTimeoutRef.current = null;
+    }
+  }, []);
+
+  const hasThinkingPlaceholder = useMemo(
+    () =>
+      messages.some(
+        (message) => message.sender === "assistant" && message.text === "🤔 Thinking...",
+      ),
+    [messages],
+  );
+
   const handleSendMessage = useCallback(
     async (messageContent?: string) => {
       // Use provided message content or fall back to inputMessage state
@@ -538,19 +565,37 @@ export default function ChatPage() {
   );
 
   const handleNewConversation = useCallback(async () => {
+    const shouldConfirm = isLoading || hasThinkingPlaceholder;
+
+    if (shouldConfirm) {
+      setIsNewConversationDialogOpen(true);
+      return;
+    }
+
     try {
-      const result = await send(LoadConversation, {});
+      resetConversationState();
+      const result = await send(ReserveConversation, {});
       setCurrentConversationId(result.conversationId);
       setCurrentConversationTitle(result.title);
       setMessages([]);
+      loadConversationsList();
+      navigate(`/c/${result.conversationId}`);
     } catch (error) {
       console.error("Failed to create conversation:", error);
     }
-  }, [send]);
+  }, [
+    hasThinkingPlaceholder,
+    isLoading,
+    loadConversationsList,
+    navigate,
+    resetConversationState,
+    send,
+  ]);
 
   const handleLoadConversation = useCallback(
     async (conversationId?: string) => {
       try {
+        resetConversationState();
         const result = await send(LoadConversation, { conversationId });
         setCurrentConversationId(result.conversationId);
         setCurrentConversationTitle(result.title);
@@ -570,7 +615,7 @@ export default function ChatPage() {
         console.error("Failed to load conversation:", error);
       }
     },
-    [send, navigate],
+    [navigate, resetConversationState, send],
   );
 
   // Load conversation from URL parameter
@@ -660,6 +705,38 @@ export default function ChatPage() {
       setIsLoading(false);
     }
   }, [currentConversationId, isLoading, send]);
+
+  const confirmNewConversation = useCallback(async () => {
+    setIsNewConversationDialogOpen(false);
+
+    if (currentConversationId && (isLoading || hasThinkingPlaceholder)) {
+      try {
+        await send(StopGeneration, { conversationId: currentConversationId });
+      } catch (error) {
+        console.error("Failed to stop generation:", error);
+      }
+    }
+
+    try {
+      resetConversationState();
+      const result = await send(ReserveConversation, {});
+      setCurrentConversationId(result.conversationId);
+      setCurrentConversationTitle(result.title);
+      setMessages([]);
+      loadConversationsList();
+      navigate(`/c/${result.conversationId}`);
+    } catch (error) {
+      console.error("Failed to create conversation:", error);
+    }
+  }, [
+    currentConversationId,
+    hasThinkingPlaceholder,
+    isLoading,
+    loadConversationsList,
+    navigate,
+    resetConversationState,
+    send,
+  ]);
 
   // ============================================================================
   // Auto-Answer Functions
@@ -1151,6 +1228,25 @@ export default function ChatPage() {
         send={send}
         onAnswered={() => setPendingQuestion(undefined)}
       />
+
+      <Dialog open={isNewConversationDialogOpen} onOpenChange={setIsNewConversationDialogOpen}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Start a new conversation?</DialogTitle>
+            <DialogDescription>
+              This will stop the current generation and start a new conversation.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsNewConversationDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmNewConversation} variant="destructive">
+              Stop and continue
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Auto-answer instructions dialog */}
       <Dialog open={isInstructionsDialogOpen} onOpenChange={setIsInstructionsDialogOpen}>

@@ -36,7 +36,11 @@ describe("QuestionRegistry", () => {
     expect(payload1.questionId).toBeDefined();
 
     // Answer Q1
-    registry.answer({ questionId: payload1.questionId, selectedOptionId: "ok" });
+    registry.answer({
+      questionId: payload1.questionId,
+      selectedOptionId: "ok",
+      conversationId: payload1.conversationId,
+    });
 
     const result1 = await askPromise1;
     expect(result1.answer.selectedOptionId).toBe("ok");
@@ -48,7 +52,11 @@ describe("QuestionRegistry", () => {
     expect(payload2.title).toBe("Q2");
 
     // Answer Q2
-    registry.answer({ questionId: payload2.questionId, selectedOptionId: "ok2" });
+    registry.answer({
+      questionId: payload2.questionId,
+      selectedOptionId: "ok2",
+      conversationId: payload2.conversationId,
+    });
     const result2 = await askPromise2;
     expect(result2.answer.selectedOptionId).toBe("ok2");
   });

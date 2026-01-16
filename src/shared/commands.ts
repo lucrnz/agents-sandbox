@@ -68,6 +68,15 @@ export const LoadConversation = registry.command(
   }),
 );
 
+export const ReserveConversation = registry.command(
+  "reserve_conversation",
+  z.object({}),
+  z.object({
+    conversationId: z.string(),
+    title: z.string(),
+  }),
+);
+
 export const GetConversations = registry.command(
   "get_conversations",
   z.object({}),
@@ -340,6 +349,7 @@ export const AnswerAgentQuestion = registry.command(
   "answer_agent_question",
   z.object({
     questionId: z.string(),
+    conversationId: z.string(),
     selectedOptionId: z.string(),
     inputValue: z.string().optional(),
   }),

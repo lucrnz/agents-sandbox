@@ -17,7 +17,7 @@ import {
 export type ProjectPermissionMode = "ask" | "yolo";
 export type ProjectExportFormat = "zip" | "tar.gz";
 
-const IGNORED_PATH_PREFIXES = [
+export const IGNORED_PATH_PREFIXES = [
   "node_modules/",
   ".venv/",
   "venv/",
