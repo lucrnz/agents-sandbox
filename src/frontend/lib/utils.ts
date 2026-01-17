@@ -29,5 +29,14 @@ export function sanitizeUrl(url?: string): string {
     }
   }
 
+  if (
+    lowerCaseUrl.startsWith("file:") ||
+    lowerCaseUrl.startsWith("blob:") ||
+    lowerCaseUrl.startsWith("chrome:") ||
+    lowerCaseUrl.startsWith("about:")
+  ) {
+    return "#";
+  }
+
   return trimmedUrl;
 }

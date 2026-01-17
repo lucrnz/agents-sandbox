@@ -168,7 +168,7 @@ export class SubAgent {
           // Check for tool calls
           if (stepResult.staticToolCalls && stepResult.staticToolCalls.length > 0) {
             for (const toolCall of stepResult.staticToolCalls) {
-              logger.info({ toolName: toolCall.toolName, input: toolCall.input }, "Tool call");
+              logger.info({ toolName: toolCall.toolName }, "Tool call");
               if (this.config.onToolCall) {
                 this.config.onToolCall(toolCall.toolName, toolCall.input);
               }

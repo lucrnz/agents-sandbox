@@ -1,4 +1,4 @@
-import { dlopen, FFIType, suffix, CString } from "bun:ffi";
+import { dlopen, FFIType, suffix, CString, type Pointer } from "bun:ffi";
 import path from "path";
 import fs from "fs";
 import { createLogger } from "@/backend/logger";
@@ -135,7 +135,7 @@ export class GoLibFFIWrapper {
    * Executes an FFI function, converts the result pointer to a string,
    * frees the pointer, and returns the string.
    */
-  private withStringResult(fn: () => any, defaultValue: string = ""): string {
+  private withStringResult(fn: () => unknown, defaultValue: string = ""): string {
     if (!this.isAvailable()) {
       throw new Error("Go library not available");
     }
@@ -148,21 +148,19 @@ export class GoLibFFIWrapper {
       let stringResult: string;
       let ptrToFree: unknown = null;
 
-      if (typeof result === "string") {
-        stringResult = result;
-      } else if (typeof result === "object") {
+      if (typeof result === "object" && result !== null) {
+        const maybePtr = result as { ptr?: unknown };
         stringResult = String(result);
-        // Bun's cstring return type often returns an object that has a 'ptr' property
-        // containing the actual memory address.
-        if (result.ptr) {
-          ptrToFree = result.ptr;
+        if (maybePtr.ptr) {
+          ptrToFree = maybePtr.ptr;
         }
+      } else if (typeof result === "string") {
+        stringResult = result;
       } else if (typeof result === "number" || typeof result === "bigint") {
-        // @TODO: Research here, for now it throws a typescript error
         // Raw pointer address - use CString to convert and then free
-        // @ts-ignore
-        stringResult = new CString(result).toString();
-        ptrToFree = result;
+        const ptrValue = Number(result);
+        stringResult = new CString(ptrValue as unknown as Pointer).toString();
+        ptrToFree = ptrValue;
       } else {
         stringResult = String(result);
         ptrToFree = result;

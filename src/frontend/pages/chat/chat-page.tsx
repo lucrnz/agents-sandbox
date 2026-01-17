@@ -51,6 +51,7 @@ import {
   type ToolName,
   type Conversation,
   type AgentPhase,
+  DEFAULT_CONVERSATION_TITLE,
 } from "@/shared/commands";
 import {
   Dialog,
@@ -118,7 +119,9 @@ export default function ChatPage() {
   const [loadingMessage, setLoadingMessage] = useState<string | undefined>();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<string>();
-  const [currentConversationTitle, setCurrentConversationTitle] = useState("New Chat");
+  const [currentConversationTitle, setCurrentConversationTitle] = useState(
+    DEFAULT_CONVERSATION_TITLE,
+  );
   const [lastFailedMessage, setLastFailedMessage] = useState<string>("");
   const [hasAgentError, setHasAgentError] = useState(false);
   const [selectedTools, setSelectedTools] = useState<ToolName[]>([]);
@@ -400,7 +403,7 @@ export default function ChatPage() {
   useEffect(() => {
     if (
       currentConversationTitle &&
-      currentConversationTitle !== "New Chat" &&
+      currentConversationTitle !== DEFAULT_CONVERSATION_TITLE &&
       messages.length > 0
     ) {
       document.title = `${currentConversationTitle} - Super Chat`;
@@ -694,10 +697,8 @@ export default function ChatPage() {
       });
 
       if (result.stopped) {
-        console.log("Generation stopped successfully");
         // The GenerationStoppedEvent will handle updating the UI
       } else {
-        console.log("No active generation to stop");
         setIsLoading(false);
       }
     } catch (error) {
@@ -744,16 +745,8 @@ export default function ChatPage() {
 
   const generateSuggestedAnswer = useCallback(
     async (instructionsOverride?: string) => {
-      console.log("[AutoAnswer] generateSuggestedAnswer called", {
-        currentConversationId,
-        isAutoAnswerMode,
-        isStarting: isStartingAutoAnswerRef.current,
-        refCurrent: isGeneratingSuggestionRef.current,
-      });
-
       // Allow execution if we're starting or if auto-answer mode is active
       if (!currentConversationId || (!isAutoAnswerMode && !isStartingAutoAnswerRef.current)) {
-        console.log("[AutoAnswer] bailing out: precondition failed");
         return;
       }
 
@@ -761,12 +754,10 @@ export default function ChatPage() {
       const instructionsToUse = instructionsOverride ?? autoAnswerInstructions;
 
       if (isGeneratingSuggestionRef.current) {
-        console.log("[AutoAnswer] bailing out: already generating (ref is true)");
         return;
       }
 
       try {
-        console.log("[AutoAnswer] Starting generation...");
         isGeneratingSuggestionRef.current = true;
         setIsGeneratingSuggestion(true);
         // Clear input to prepare for streaming
@@ -786,20 +777,12 @@ export default function ChatPage() {
         // The result contains the full suggested answer
         // Check wasStarting to handle the case where isAutoAnswerMode hasn't propagated yet
         if (result.suggestedAnswer && (isAutoAnswerMode || wasStarting)) {
-          console.log("[AutoAnswer] Generation complete, sending message...");
           // The chunks have been streaming to inputMessage for visual feedback
           // Now send the complete result directly to ensure the full message is sent
           await handleSendMessage(result.suggestedAnswer);
-          console.log("[AutoAnswer] Message sent, clearing input");
           setInputMessage("");
 
           // Trigger next iteration immediately when ready (via response effect)
-        } else {
-          console.log("[AutoAnswer] Result ignored:", {
-            hasSuggestedAnswer: !!result.suggestedAnswer,
-            isAutoAnswerMode,
-            wasStarting,
-          });
         }
       } catch (error) {
         console.error("Error generating suggested answer:", error);
@@ -807,7 +790,6 @@ export default function ChatPage() {
         setIsAutoAnswerMode(false);
         isStartingAutoAnswerRef.current = false;
       } finally {
-        console.log("[AutoAnswer] Finally block, resetting ref");
         setIsGeneratingSuggestion(false);
         isGeneratingSuggestionRef.current = false;
       }
@@ -817,7 +799,6 @@ export default function ChatPage() {
 
   const startAutoAnswerMode = useCallback(
     (instructions: string) => {
-      console.log("[AutoAnswer] startAutoAnswerMode called");
       setAutoAnswerInstructions(instructions);
       setIsAutoAnswerMode(true);
       // Set flag to allow immediate execution before state propagates
@@ -846,8 +827,12 @@ export default function ChatPage() {
       const lastMessage = messages[messages.length - 1];
 
       if (lastMessage?.sender === "assistant") {
-        // Trigger immediately without delay
-        generateSuggestedAnswer();
+        if (autoAnswerTimeoutRef.current) {
+          clearTimeout(autoAnswerTimeoutRef.current);
+        }
+        autoAnswerTimeoutRef.current = setTimeout(() => {
+          generateSuggestedAnswer();
+        }, 800);
       }
     }
 
@@ -916,7 +901,7 @@ export default function ChatPage() {
       <div className="flex min-h-0 flex-1 flex-col">
         <header className="bg-card flex shrink-0 items-center justify-between border-b px-4 py-5 shadow-sm">
           <h1 className="text-foreground text-xl font-bold">
-            {messages.length > 0 && currentConversationTitle !== "New Chat"
+            {messages.length > 0 && currentConversationTitle !== DEFAULT_CONVERSATION_TITLE
               ? `${currentConversationTitle} - Super Chat`
               : "Super Chat"}
           </h1>

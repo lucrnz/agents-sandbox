@@ -59,21 +59,15 @@ export class ChatOrchestrator {
   async processUserMessage(content: string) {
     // 1. Title generation (if applicable)
     // We track this background task for observability and error handling
-    this.taskTracker.track(
-      "title_generation",
-      this.conversationId,
-      this.generateTitleIfNeeded(content),
-      this.ws,
-    );
+    this.taskTracker
+      .track("title_generation", this.conversationId, this.generateTitleIfNeeded(content), this.ws)
+      .catch((error) => logger.error({ error }, "Title generation task failed"));
 
     // 2. AI Response generation
     // This is also tracked as a background task
-    this.taskTracker.track(
-      "ai_response",
-      this.conversationId,
-      this.streamAIResponse(content),
-      this.ws,
-    );
+    this.taskTracker
+      .track("ai_response", this.conversationId, this.streamAIResponse(content), this.ws)
+      .catch((error) => logger.error({ error }, "AI response task failed"));
   }
 
   /**

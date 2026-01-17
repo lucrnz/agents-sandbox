@@ -24,6 +24,8 @@ const ConversationSchema = z.object({
 export const ProjectPermissionModeSchema = z.enum(["ask", "yolo"]);
 export type ProjectPermissionMode = z.infer<typeof ProjectPermissionModeSchema>;
 
+export const DEFAULT_CONVERSATION_TITLE = "New Chat";
+
 const ProjectSchema = z.object({
   id: z.string(),
   name: z.string(),

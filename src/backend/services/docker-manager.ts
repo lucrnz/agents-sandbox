@@ -4,6 +4,7 @@ import archiver from "archiver";
 import { PassThrough, type Readable } from "stream";
 import * as tarStream from "tar-stream";
 import { ProjectService, IGNORED_PATH_PREFIXES } from "@/backend/services/project-service";
+import { createLogger } from "@/backend/logger";
 
 type ConversationId = string;
 
@@ -23,6 +24,7 @@ type ManagedContainer = {
 };
 
 const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+const logger = createLogger("backend:docker-manager");
 
 function isIgnoredPath(relPath: string): boolean {
   const p = relPath.replaceAll("\\", "/");
@@ -167,6 +169,16 @@ export class DockerManager {
       } catch {
         // ignore
       }
+      try {
+        exec.resize({ h: 0, w: 0 }).catch(() => {});
+      } catch {
+        // ignore
+      }
+      try {
+        exec.inspect().catch(() => {});
+      } catch {
+        // ignore
+      }
     }, timeoutMs);
 
     const [stdout, stderr] = await Promise.all([
@@ -256,7 +268,9 @@ export class DockerManager {
       writeOps.push(writeOp);
 
       writeOp
-        .catch(() => {})
+        .catch((error) =>
+          logger.error({ error, path: relPath }, "Failed to sync file from container"),
+        )
         .finally(() => {
           next();
         });

@@ -49,7 +49,9 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
               </a>
             );
           },
-          img: () => null,
+          img: () => (
+            <span className="text-muted-foreground block italic">[Image omitted for security]</span>
+          ),
           blockquote: ({ children }) => (
             <blockquote className="mb-4 border-l-4 border-gray-300 pl-4 italic dark:border-neutral-700">
               {children}

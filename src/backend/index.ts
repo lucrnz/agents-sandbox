@@ -84,6 +84,13 @@ const server = serve<{ conversationId?: string }>({
         }
       } catch (error) {
         logger.error({ error }, "WebSocket message processing error");
+        const errorResponse = createCommandError(
+          "unknown",
+          "unknown",
+          "INVALID_MESSAGE",
+          "Invalid WebSocket message format.",
+        );
+        ws.send(JSON.stringify(errorResponse));
       }
     },
 
