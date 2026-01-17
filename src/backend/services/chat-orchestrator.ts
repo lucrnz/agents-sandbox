@@ -357,7 +357,11 @@ export class ChatOrchestrator {
       // Fetch existing projects to let user choose
       const projects = await listProjects();
 
-      const options = projects.map((p) => ({
+      const options: Array<{
+        id: string;
+        label: string;
+        inputField?: { placeholder: string };
+      }> = projects.map((p) => ({
         id: p.id,
         label: p.name,
       }));
@@ -365,7 +369,6 @@ export class ChatOrchestrator {
       options.push({
         id: "create_new",
         label: "Create new project",
-        // @ts-expect-error - inputField is valid but might need type refinement in shared schemas
         inputField: { placeholder: "Project name (optional)" },
       });
 

@@ -1,4 +1,5 @@
-import { test, expect, describe, beforeAll, afterAll, mock } from "bun:test";
+import { test, expect, describe, beforeAll, afterAll } from "bun:test";
+import type { LanguageModel } from "ai";
 import {
   virtualPathToActual,
   actualPathToVirtual,
@@ -185,15 +186,21 @@ describe("SubAgent Workspace Management", () => {
 });
 
 describe("SubAgent Class", () => {
+  class TestSubAgent extends SubAgent {
+    public testBuildSystemPrompt() {
+      return this.buildSystemPrompt();
+    }
+  }
+
   test("buildSystemPrompt should include current date and virtual path", () => {
-    const subAgent = new SubAgent({
-      model: {} as any,
+    const model: LanguageModel = "test-model";
+    const subAgent = new TestSubAgent({
+      model,
       system: "Test system prompt",
       tools: {},
     });
 
-    // @ts-ignore - accessing private method for testing
-    const prompt = subAgent.buildSystemPrompt();
+    const prompt = subAgent.testBuildSystemPrompt();
     const today = new Date().toDateString();
 
     expect(prompt).toContain("Test system prompt");

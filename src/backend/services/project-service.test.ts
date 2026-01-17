@@ -2,9 +2,24 @@ import { describe, test, expect, mock, beforeEach } from "bun:test";
 import { ProjectService } from "./project-service";
 import { Buffer } from "buffer";
 
+type ProjectInput = {
+  name: string;
+  description?: string;
+};
+
+type ProjectFileRow = {
+  id: number;
+  projectId: string;
+  path: string;
+  content: Buffer;
+  mimeType?: string;
+  size?: number;
+  updatedAt?: Date;
+};
+
 // Mock DB module
 const mockDb = {
-  createProject: mock(async (input: any) => ({
+  createProject: mock(async (input: ProjectInput) => ({
     id: "test-id",
     name: input.name,
     description: input.description,
@@ -15,7 +30,9 @@ const mockDb = {
   getProject: mock(async (id: string) => ({ id, name: "test-project" })),
   listProjectFiles: mock(async () => []),
   upsertProjectFile: mock(async () => ({ id: 1 })),
-  getProjectFile: mock(async (projectId: string, path: string): Promise<any> => null),
+  getProjectFile: mock(
+    async (_projectId: string, _path: string): Promise<ProjectFileRow | null> => null,
+  ),
   deleteProjectFile: mock(async () => {}),
   ensureDefaultProject: mock(async () => ({ id: "default" })),
   listProjects: mock(async () => []),
@@ -123,6 +140,9 @@ describe("ProjectService", () => {
 
   test("readFileAsText should return content", async () => {
     mockDb.getProjectFile.mockResolvedValueOnce({
+      id: 1,
+      projectId: "p1",
+      path: "hello.txt",
       content: Buffer.from("hello world"),
       mimeType: "text/plain",
     });

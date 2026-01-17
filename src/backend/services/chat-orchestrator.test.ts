@@ -10,7 +10,7 @@ import type { AIResponseChunkPayload, AgentStatusUpdatePayload } from "@/shared/
 describe("ChatOrchestrator", () => {
   let ws: ServerWebSocket<{ conversationId?: string }>;
   let orchestrator: ChatOrchestrator;
-  let spies: Mock<any>[] = [];
+  let spies: Array<{ mockRestore: () => void }> = [];
 
   beforeEach(() => {
     ws = {

@@ -1,4 +1,7 @@
 import { test, expect, describe, beforeEach, afterEach, mock } from "bun:test";
+import type { GenerateTextResult } from "ai";
+import type { Output as AiOutput } from "ai";
+
 import {
   generateConversationTitle,
   inferPageTitle,
@@ -16,10 +19,20 @@ mock.module("@/backend/go-lib-ffi", () => ({
 }));
 
 // Mock AI SDK
-const mockGenerateText = mock(async () => ({
-  text: "Mocked Title",
-  output: { title: "Mocked Title" },
-}));
+type MockGenerateTextResult = GenerateTextResult<Record<string, never>, never>;
+
+type MockGenerateTextResponse = {
+  text?: string;
+  output?: {
+    title?: string;
+  };
+};
+
+const toGenerateTextResult = (response: MockGenerateTextResponse): MockGenerateTextResult =>
+  response as unknown as MockGenerateTextResult;
+
+const mockGenerateText = mock(async () => ({}) as MockGenerateTextResult);
+
 mock.module("ai", () => ({
   generateText: mockGenerateText,
   Output: {
@@ -35,12 +48,12 @@ describe("Title Generation", () => {
 
   describe("generateConversationTitle", () => {
     test("should generate a title successfully", async () => {
-      mockGenerateText.mockImplementationOnce(
-        async () =>
-          ({
-            output: { title: "A Great Conversation" },
-          }) as any,
-      );
+      mockGenerateText.mockImplementationOnce(async () => {
+        const response: MockGenerateTextResponse = {
+          output: { title: "A Great Conversation" },
+        };
+        return toGenerateTextResult(response);
+      });
 
       const title = await generateConversationTitle("User: Hello\nAssistant: Hi there!");
 
@@ -62,12 +75,12 @@ describe("Title Generation", () => {
 
   describe("inferPageTitle", () => {
     test("should infer title from URL via AI", async () => {
-      mockGenerateText.mockImplementationOnce(
-        async () =>
-          ({
-            text: "Example Page",
-          }) as any,
-      );
+      mockGenerateText.mockImplementationOnce(async () => {
+        const response: MockGenerateTextResponse = {
+          text: "Example Page",
+        };
+        return toGenerateTextResult(response);
+      });
 
       const title = await inferPageTitle("http://example.com/page");
 
@@ -87,12 +100,12 @@ describe("Title Generation", () => {
 
   describe("extractSearchKeywords", () => {
     test("should extract keywords correctly via AI", async () => {
-      mockGenerateText.mockImplementationOnce(
-        async () =>
-          ({
-            text: "benefits bun typescript development",
-          }) as any,
-      );
+      mockGenerateText.mockImplementationOnce(async () => {
+        const response: MockGenerateTextResponse = {
+          text: "benefits bun typescript development",
+        };
+        return toGenerateTextResult(response);
+      });
 
       const query = "What are the benefits of using Bun for TypeScript development?";
       const keywords = await extractSearchKeywords(query);
@@ -119,12 +132,12 @@ describe("Title Generation", () => {
 
   describe("generateShortFilenameDescription", () => {
     test("should generate filename-safe description", async () => {
-      mockGenerateText.mockImplementationOnce(
-        async () =>
-          ({
-            text: "Cool Project Ideas",
-          }) as any,
-      );
+      mockGenerateText.mockImplementationOnce(async () => {
+        const response: MockGenerateTextResponse = {
+          text: "Cool Project Ideas",
+        };
+        return toGenerateTextResult(response);
+      });
 
       const desc = await generateShortFilenameDescription("Some project content");
 

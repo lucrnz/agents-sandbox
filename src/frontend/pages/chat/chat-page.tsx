@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { createFrontendLogger } from "@/frontend/lib/utils";
 import { useParams, useLocation } from "wouter";
 import { Button } from "@/frontend/components/ui/button";
 import {
@@ -128,6 +129,8 @@ export default function ChatPage() {
   const [expandedReasoning, setExpandedReasoning] = useState<Set<number>>(new Set());
   const [pendingQuestion, setPendingQuestion] = useState<AgentQuestionPayload | undefined>();
   const [isNewConversationDialogOpen, setIsNewConversationDialogOpen] = useState(false);
+
+  const logger = useMemo(() => createFrontendLogger("chat-page"), []);
 
   // Random greeting - memoized to stay consistent during session
   const greeting = useMemo(() => GREETINGS[Math.floor(Math.random() * GREETINGS.length)], []);
@@ -462,9 +465,9 @@ export default function ChatPage() {
       const result = await send(GetConversations, {});
       setConversations(result.conversations);
     } catch (error) {
-      console.error("Failed to load conversations:", error);
+      logger.error("Failed to load conversations", error);
     }
-  }, [send]);
+  }, [send, logger]);
 
   const resetConversationState = useCallback(() => {
     setIsLoading(false);
@@ -546,7 +549,7 @@ export default function ChatPage() {
           loadConversationsList();
         }
       } catch (error) {
-        console.error("Failed to send message:", error);
+        logger.error("Failed to send message", error, { conversationId: currentConversationId });
         setIsLoading(false);
         setLastFailedMessage(finalMessageContent);
         setHasAgentError(true);
@@ -564,7 +567,15 @@ export default function ChatPage() {
         ]);
       }
     },
-    [inputMessage, isConnected, currentConversationId, selectedTools, send, loadConversationsList],
+    [
+      inputMessage,
+      isConnected,
+      currentConversationId,
+      selectedTools,
+      send,
+      loadConversationsList,
+      logger,
+    ],
   );
 
   const handleNewConversation = useCallback(async () => {
@@ -584,7 +595,7 @@ export default function ChatPage() {
       loadConversationsList();
       navigate(`/c/${result.conversationId}`);
     } catch (error) {
-      console.error("Failed to create conversation:", error);
+      logger.error("Failed to create conversation", error);
     }
   }, [
     hasThinkingPlaceholder,
@@ -593,6 +604,7 @@ export default function ChatPage() {
     navigate,
     resetConversationState,
     send,
+    logger,
   ]);
 
   const handleLoadConversation = useCallback(
@@ -615,10 +627,10 @@ export default function ChatPage() {
           navigate(`/c/${conversationId}`);
         }
       } catch (error) {
-        console.error("Failed to load conversation:", error);
+        logger.error("Failed to load conversation", error, { conversationId });
       }
     },
-    [navigate, resetConversationState, send],
+    [navigate, resetConversationState, send, logger],
   );
 
   // Load conversation from URL parameter
@@ -670,7 +682,7 @@ export default function ChatPage() {
         setCurrentConversationId(result.conversationId);
       }
     } catch (error) {
-      console.error("Failed to retry message:", error);
+      logger.error("Failed to retry message", error, { conversationId: currentConversationId });
       setIsLoading(false);
       setMessages((prev) => [
         ...prev,
@@ -685,7 +697,7 @@ export default function ChatPage() {
         },
       ]);
     }
-  }, [lastFailedMessage, currentConversationId, send]);
+  }, [lastFailedMessage, currentConversationId, send, logger]);
 
   const handleStopGeneration = useCallback(async () => {
     if (!currentConversationId || !isLoading) return;
@@ -702,10 +714,10 @@ export default function ChatPage() {
         setIsLoading(false);
       }
     } catch (error) {
-      console.error("Failed to stop generation:", error);
+      logger.error("Failed to stop generation", error, { conversationId: currentConversationId });
       setIsLoading(false);
     }
-  }, [currentConversationId, isLoading, send]);
+  }, [currentConversationId, isLoading, send, logger]);
 
   const confirmNewConversation = useCallback(async () => {
     setIsNewConversationDialogOpen(false);
@@ -714,7 +726,7 @@ export default function ChatPage() {
       try {
         await send(StopGeneration, { conversationId: currentConversationId });
       } catch (error) {
-        console.error("Failed to stop generation:", error);
+        logger.error("Failed to stop generation", error, { conversationId: currentConversationId });
       }
     }
 
@@ -727,7 +739,7 @@ export default function ChatPage() {
       loadConversationsList();
       navigate(`/c/${result.conversationId}`);
     } catch (error) {
-      console.error("Failed to create conversation:", error);
+      logger.error("Failed to create conversation", error);
     }
   }, [
     currentConversationId,
@@ -737,6 +749,7 @@ export default function ChatPage() {
     navigate,
     resetConversationState,
     send,
+    logger,
   ]);
 
   // ============================================================================
@@ -785,7 +798,10 @@ export default function ChatPage() {
           // Trigger next iteration immediately when ready (via response effect)
         }
       } catch (error) {
-        console.error("Error generating suggested answer:", error);
+        logger.error("Error generating suggested answer", error, {
+          conversationId: currentConversationId,
+          isAutoAnswerMode,
+        });
         toast.error("Failed to generate auto-answer. Disabling auto-answer mode.");
         setIsAutoAnswerMode(false);
         isStartingAutoAnswerRef.current = false;
@@ -794,7 +810,14 @@ export default function ChatPage() {
         isGeneratingSuggestionRef.current = false;
       }
     },
-    [currentConversationId, isAutoAnswerMode, autoAnswerInstructions, send, handleSendMessage],
+    [
+      currentConversationId,
+      isAutoAnswerMode,
+      autoAnswerInstructions,
+      send,
+      handleSendMessage,
+      logger,
+    ],
   );
 
   const startAutoAnswerMode = useCallback(

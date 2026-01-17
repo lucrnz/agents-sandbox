@@ -212,7 +212,7 @@ export class SubAgent {
   /**
    * Build system prompt with environment info
    */
-  private buildSystemPrompt(): string {
+  protected buildSystemPrompt(): string {
     const today = new Date().toDateString();
     return `${this.config.system}
 
