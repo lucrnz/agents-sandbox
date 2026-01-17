@@ -22,6 +22,7 @@ import { FileTree, type FileTreeFile } from "@/frontend/components/file-tree";
 import {
   CreateProject,
   DeleteProject,
+  DeleteProjectPath,
   ExportProject,
   GetProjectFiles,
   GetProjects,
@@ -63,6 +64,10 @@ export function ProjectsSidebar({
   const [files, setFiles] = React.useState<FileTreeFile[]>([]);
   const [selectedFilePath, setSelectedFilePath] = React.useState<string>();
   const [selectedFileContent, setSelectedFileContent] = React.useState<string>("");
+  const [pendingDelete, setPendingDelete] = React.useState<
+    { path: string; kind: "file" | "dir" } | undefined
+  >();
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
 
   const [permissionMode, setPermissionMode] = React.useState<ProjectPermissionMode>("ask");
 
@@ -151,6 +156,49 @@ export function ProjectsSidebar({
     if (!conversationId) return;
     const res = await send(SetPermissionMode, { conversationId, permissionMode: mode });
     setPermissionMode(res.permissionMode);
+  };
+
+  const getDeleteCount = React.useCallback(
+    (path: string, kind: "file" | "dir") => {
+      if (kind === "file") return 1;
+      const prefix = `${path}/`;
+      return files.filter((file) => file.path === path || file.path.startsWith(prefix)).length;
+    },
+    [files],
+  );
+
+  const handleRequestDelete = (input: { path: string; kind: "file" | "dir" }) => {
+    setPendingDelete(input);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!pendingDelete || !selectedProjectId) return;
+    const target = pendingDelete;
+    setIsDeleteDialogOpen(false);
+
+    await send(DeleteProjectPath, {
+      projectId: selectedProjectId,
+      path: target.path,
+      kind: target.kind,
+    });
+
+    if (selectedFilePath) {
+      if (target.kind === "file" && selectedFilePath === target.path) {
+        setSelectedFilePath(undefined);
+        setSelectedFileContent("");
+      }
+      if (target.kind === "dir") {
+        const prefix = `${target.path}/`;
+        if (selectedFilePath === target.path || selectedFilePath.startsWith(prefix)) {
+          setSelectedFilePath(undefined);
+          setSelectedFileContent("");
+        }
+      }
+    }
+
+    setPendingDelete(undefined);
+    await refreshFiles(selectedProjectId);
   };
 
   return (
@@ -256,6 +304,7 @@ export function ProjectsSidebar({
               <FileTree
                 files={files}
                 onSelectFile={handleSelectFile}
+                onDeletePath={handleRequestDelete}
                 selectedPath={selectedFilePath}
               />
             </div>
@@ -307,6 +356,53 @@ export function ProjectsSidebar({
             </Button>
             <Button onClick={handleCreateProject} disabled={!newProjectName.trim()}>
               Create
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isDeleteDialogOpen}
+        onOpenChange={(open) => {
+          setIsDeleteDialogOpen(open);
+          if (!open) setPendingDelete(undefined);
+        }}
+      >
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>
+              {pendingDelete?.kind === "dir" ? "Delete Folder" : "Delete File"}
+            </DialogTitle>
+            <DialogDescription>
+              {pendingDelete
+                ? pendingDelete.kind === "dir"
+                  ? "This will permanently remove the folder and its contents from the project."
+                  : "This will permanently remove the file from the project."
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          {pendingDelete && (
+            <div className="space-y-3 py-2 text-sm">
+              <div className="rounded-md border px-3 py-2">
+                <div className="text-muted-foreground text-xs tracking-wide uppercase">Path</div>
+                <div className="mt-1 font-medium break-all">{pendingDelete.path}</div>
+              </div>
+              <div className="rounded-md border px-3 py-2">
+                <div className="text-muted-foreground text-xs tracking-wide uppercase">
+                  Files to delete
+                </div>
+                <div className="mt-1 font-medium">
+                  {getDeleteCount(pendingDelete.path, pendingDelete.kind)}
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleConfirmDelete}>
+              Delete
             </Button>
           </DialogFooter>
         </DialogContent>

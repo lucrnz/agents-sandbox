@@ -6,6 +6,7 @@ import {
   createProject,
   deleteProject,
   deleteProjectFile,
+  deleteProjectPathPrefix,
   ensureDefaultProject,
   getProject,
   getProjectFile,
@@ -163,6 +164,18 @@ export class ProjectService {
     const normalized = normalizeProjectPath(path);
     if (isIgnoredPath(normalized)) return;
     await deleteProjectFile(projectId, normalized);
+  }
+
+  async deletePath(projectId: string, path: string, kind: "file" | "dir") {
+    const normalized = normalizeProjectPath(path);
+    if (isIgnoredPath(normalized)) return 0;
+
+    if (kind === "dir") {
+      return await deleteProjectPathPrefix(projectId, normalized);
+    }
+
+    await deleteProjectFile(projectId, normalized);
+    return 1;
   }
 
   async exportProject(

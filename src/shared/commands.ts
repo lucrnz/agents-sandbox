@@ -167,6 +167,19 @@ export const DeleteProject = registry.command(
   }),
 );
 
+export const DeleteProjectPath = registry.command(
+  "delete_project_path",
+  z.object({
+    projectId: z.string().min(1, "Project ID is required"),
+    path: z.string().min(1, "Path is required"),
+    kind: z.enum(["file", "dir"]),
+  }),
+  z.object({
+    deleted: z.boolean(),
+    deletedCount: z.number().int().nonnegative(),
+  }),
+);
+
 export const ExportProject = registry.command(
   "export_project",
   z.object({
@@ -399,6 +412,7 @@ export type GetProjectsResponse = z.infer<typeof GetProjects.responseSchema>;
 export type GetProjectFilesResponse = z.infer<typeof GetProjectFiles.responseSchema>;
 export type ReadProjectFileResponse = z.infer<typeof ReadProjectFile.responseSchema>;
 export type ExportProjectResponse = z.infer<typeof ExportProject.responseSchema>;
+export type DeleteProjectPathResponse = z.infer<typeof DeleteProjectPath.responseSchema>;
 export type SelectProjectForConversationResponse = z.infer<
   typeof SelectProjectForConversation.responseSchema
 >;

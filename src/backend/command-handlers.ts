@@ -1,22 +1,24 @@
 import type { ServerWebSocket } from "bun";
 import { registry, type CommandDef } from "@/shared/command-system";
 import {
-  SendMessage,
-  LoadConversation,
-  ReserveConversation,
-  GetConversations,
-  SuggestAnswer,
-  StopGeneration,
-  CreateProject,
-  GetProjects,
-  GetProjectFiles,
-  ReadProjectFile,
-  DeleteProject,
-  ExportProject,
-  SelectProjectForConversation,
-  SetPermissionMode,
   AnswerAgentQuestion,
+  CreateProject,
+  DeleteProject,
+  DeleteProjectPath,
+  ExportProject,
+  GetConversations,
+  GetProjectFiles,
+  GetProjects,
+  LoadConversation,
+  ReadProjectFile,
+  ReserveConversation,
+  SelectProjectForConversation,
+  SendMessage,
+  SetPermissionMode,
+  StopGeneration,
+  SuggestAnswer,
 } from "@/shared/commands";
+
 import {
   getOrCreateConversation,
   getConversation,
@@ -342,6 +344,15 @@ commandHandlers.register(ReadProjectFile, async (payload) => {
 commandHandlers.register(DeleteProject, async (payload) => {
   await projectService.deleteProject(payload.projectId);
   return { deleted: true };
+});
+
+commandHandlers.register(DeleteProjectPath, async (payload) => {
+  const deletedCount = await projectService.deletePath(
+    payload.projectId,
+    payload.path,
+    payload.kind,
+  );
+  return { deleted: true, deletedCount };
 });
 
 commandHandlers.register(ExportProject, async (payload) => {

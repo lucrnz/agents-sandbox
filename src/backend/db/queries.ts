@@ -6,7 +6,7 @@ import {
   projectFilesTable,
   projectsTable,
 } from "./schema";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, like, or } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { Buffer } from "buffer";
 
@@ -261,6 +261,25 @@ export async function deleteProjectFile(projectId: string, path: string) {
     .update(projectsTable)
     .set({ updatedAt: new Date() })
     .where(eq(projectsTable.id, projectId));
+}
+
+export async function deleteProjectPathPrefix(projectId: string, prefix: string) {
+  const rows = await db
+    .delete(projectFilesTable)
+    .where(
+      and(
+        eq(projectFilesTable.projectId, projectId),
+        or(eq(projectFilesTable.path, prefix), like(projectFilesTable.path, `${prefix}/%`)),
+      ),
+    )
+    .returning({ id: projectFilesTable.id });
+
+  await db
+    .update(projectsTable)
+    .set({ updatedAt: new Date() })
+    .where(eq(projectsTable.id, projectId));
+
+  return rows.length;
 }
 
 export async function getConversationProject(conversationId: string) {

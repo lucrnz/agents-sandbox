@@ -1,5 +1,5 @@
 import * as React from "react";
-import { ChevronDown, ChevronRight, FileText, Folder } from "lucide-react";
+import { ChevronDown, ChevronRight, FileText, Folder, Trash2 } from "lucide-react";
 import { Button } from "@/frontend/components/ui/button";
 
 export type FileTreeFile = {
@@ -53,10 +53,12 @@ function sortChildren(children: Map<string, TreeNode>): TreeNode[] {
 export function FileTree({
   files,
   onSelectFile,
+  onDeletePath,
   selectedPath,
 }: {
   files: FileTreeFile[];
   onSelectFile: (path: string) => void;
+  onDeletePath?: (input: { path: string; kind: "file" | "dir" }) => void;
   selectedPath?: string;
 }) {
   const tree = React.useMemo(() => buildTree(files), [files]);
@@ -81,16 +83,37 @@ export function FileTree({
       return (
         <div key={`dir:${node.path || "root"}`}>
           {node.path !== "" && (
-            <button
-              type="button"
-              onClick={() => toggleDir(node.path)}
-              className="hover:bg-muted flex w-full items-center gap-2 rounded-sm px-2 py-1 text-left text-sm"
+            <div
+              className="group hover:bg-muted flex w-full items-center gap-2 rounded-sm px-2 py-1 text-left text-sm"
               style={indent}
             >
-              {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              <Folder className="h-4 w-4 text-amber-500" />
-              <span className="truncate">{node.name}</span>
-            </button>
+              <button
+                type="button"
+                onClick={() => toggleDir(node.path)}
+                className="flex min-w-0 flex-1 items-center gap-2 text-left"
+              >
+                {isOpen ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
+                <Folder className="h-4 w-4 text-amber-500" />
+                <span className="truncate">{node.name}</span>
+              </button>
+              {onDeletePath && (
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground opacity-0 transition-opacity group-hover:opacity-100"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onDeletePath({ path: node.path, kind: "dir" });
+                  }}
+                  title="Delete folder"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
+            </div>
           )}
 
           {(node.path === "" || isOpen) &&
@@ -101,17 +124,30 @@ export function FileTree({
 
     const isSelected = node.path === selectedPath;
     return (
-      <Button
-        key={`file:${node.path}`}
-        variant={isSelected ? "secondary" : "ghost"}
-        className="h-8 w-full justify-start gap-2 px-2 text-left text-sm"
-        style={indent}
-        onClick={() => onSelectFile(node.path)}
-      >
-        <FileText className="h-4 w-4" />
-        <span className="truncate">{node.name}</span>
-        <span className="text-muted-foreground ml-auto text-xs">{node.size}b</span>
-      </Button>
+      <div key={`file:${node.path}`} className="group relative" style={indent}>
+        <Button
+          variant={isSelected ? "secondary" : "ghost"}
+          className="h-8 w-full justify-start gap-2 px-2 pr-8 text-left text-sm"
+          onClick={() => onSelectFile(node.path)}
+        >
+          <FileText className="h-4 w-4" />
+          <span className="truncate">{node.name}</span>
+          <span className="text-muted-foreground ml-auto text-xs">{node.size}b</span>
+        </Button>
+        {onDeletePath && (
+          <button
+            type="button"
+            className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100"
+            onClick={(event) => {
+              event.stopPropagation();
+              onDeletePath({ path: node.path, kind: "file" });
+            }}
+            title="Delete file"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
+      </div>
     );
   };
 
