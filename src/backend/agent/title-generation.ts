@@ -26,14 +26,13 @@ export async function generateConversationTitle(content: string): Promise<string
           title: z
             .string()
             .describe("The title of the conversation")
-            .refine((title) => title.split(" ").length <= 5, {
-              message: "Title must be less than or equal to 5 words",
-            }),
+            .min(1, "Title is required")
+            .max(200, "Title must be less than or equal to 200 characters"),
         }),
       }),
-      prompt: `Generate a concise title (max 5 words) for this conversation.
+      prompt: `Generate a concise title (max 200 characters) for this conversation.
       Rules:
-      - Maximum 5 words
+      - Maximum 200 characters
       - Captures main topic
       - Professional but friendly tone
       - No quotes or special characters
