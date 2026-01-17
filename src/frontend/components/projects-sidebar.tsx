@@ -1,5 +1,13 @@
 import * as React from "react";
-import { ChevronLeft, ChevronRight, Download, FolderPlus, Trash2 } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  FolderPlus,
+  Trash2,
+  Maximize2,
+  Minimize2,
+} from "lucide-react";
 import { Button } from "@/frontend/components/ui/button";
 import { Input } from "@/frontend/components/ui/input";
 import { Textarea } from "@/frontend/components/ui/textarea";
@@ -59,6 +67,7 @@ export function ProjectsSidebar({
   send: SendFn;
 }) {
   const [isOpen, setIsOpen] = React.useState(false);
+  const [isExpanded, setIsExpanded] = React.useState(false);
   const [projects, setProjects] = React.useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = React.useState<string>("");
   const [files, setFiles] = React.useState<FileTreeFile[]>([]);
@@ -218,11 +227,27 @@ export function ProjectsSidebar({
 
       {/* Sidebar */}
       {isOpen && (
-        <aside className="bg-card border-muted-foreground/20 fixed top-0 right-0 z-10 flex h-screen w-[420px] flex-col border-l shadow-lg">
+        <aside
+          className={`bg-card border-muted-foreground/20 fixed top-0 right-0 z-10 flex h-screen flex-col border-l shadow-lg transition-all duration-300 ${
+            isExpanded ? "w-[75Okayvw]" : "w-[420px]"
+          }`}
+        >
           <div className="border-b p-4">
             <div className="flex items-center justify-between">
               <h2 className="text-foreground text-lg font-semibold">Projects</h2>
               <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setIsExpanded((v) => !v)}
+                  title={isExpanded ? "Collapse" : "Expand"}
+                >
+                  {isExpanded ? (
+                    <Minimize2 className="h-4 w-4" />
+                  ) : (
+                    <Maximize2 className="h-4 w-4" />
+                  )}
+                </Button>
                 <Button
                   variant="outline"
                   size="icon"
@@ -299,7 +324,11 @@ export function ProjectsSidebar({
             </div>
           </div>
 
-          <div className="grid min-h-0 flex-1 grid-cols-2 gap-0">
+          <div
+            className={`grid min-h-0 flex-1 gap-0 ${
+              isExpanded ? "grid-cols-[300px_1fr]" : "grid-cols-2"
+            }`}
+          >
             <div className="min-h-0 overflow-auto border-r p-3">
               <FileTree
                 files={files}
