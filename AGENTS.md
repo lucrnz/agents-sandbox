@@ -237,6 +237,12 @@ import { Route, Switch, Link } from "wouter";
 const { sendCommand, sendEvent, lastMessage, readyState } = useWebSocket();
 ```
 
+## API Transport Policy
+
+- REST API connections are deprecated moving forward. Only use REST to serve the frontend and static assets, and possibly for downloads when required.
+- All application interactions must be done through the WebSocket command system.
+- End-to-end payloads SHOULD be validated with Zod on both client and server; prefer shared schemas in `src/shared/commands.ts`.
+
 ## Environment Variables
 
 Create `.env` file (copy from `.env.example`):
